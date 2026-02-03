@@ -125,9 +125,17 @@ class MessageProcessor:
 
         return filename, content
 
-    def _try_ai_format(self, message: MessageData) -> Optional[str]:
+    def _try_ai_format(
+        self,
+        message: MessageData,
+        existing_content: str = None,
+    ) -> Optional[str]:
         """
         Try to format message content using AI.
+
+        Args:
+            message: Message data to format
+            existing_content: Existing Obsidian file content to integrate with
 
         Returns:
             AI-formatted content, or None if AI is unavailable or failed
@@ -149,28 +157,64 @@ class MessageProcessor:
             "channel_type": message.channel_type,
         }
 
-        result = self.ai.format_message(message.content, metadata)
+        result = self.ai.format_message(message.content, metadata, existing_content)
 
         if result:
-            logger.info("Message formatted by AI")
+            if existing_content:
+                logger.info("Message integrated with existing content by AI")
+            else:
+                logger.info("Message formatted by AI")
         else:
             logger.info("AI formatting failed, using fallback")
 
         return result
 
-    def process(self, message: MessageData) -> Tuple[str, str, bool]:
+    @staticmethod
+    def _strip_frontmatter(content: str) -> str:
+        """
+        Remove YAML frontmatter from content.
+
+        When appending to an existing daily file, the AI-generated
+        frontmatter must be stripped to avoid duplicates.
+
+        Args:
+            content: Markdown content possibly starting with frontmatter
+
+        Returns:
+            Content without frontmatter
+        """
+        stripped = content.strip()
+        if stripped.startswith("---"):
+            # Find the closing ---
+            end = stripped.find("---", 3)
+            if end != -1:
+                body = stripped[end + 3:].strip()
+                return body
+        return stripped
+
+    def process(
+        self,
+        message: MessageData,
+        existing_content: str = None,
+    ) -> Tuple[str, str, bool]:
         """
         Process a message and return filename and content.
 
         If AI is configured and available, uses AI to format the content.
+        When existing_content is provided, AI integrates the new message
+        with existing file content (returning a complete file to overwrite).
         Otherwise falls back to plain Markdown templates.
+
+        For daily (append) mode without existing content, frontmatter is
+        stripped from AI output to prevent duplicates.
 
         Args:
             message: Message data to process
+            existing_content: Existing Obsidian file content for AI integration
 
         Returns:
             Tuple of (filename, content, should_append)
-            should_append is True for daily template
+            should_append is False when AI successfully integrates existing content
         """
         logger.debug(f"Processing message with template: {self.template}")
 
@@ -184,10 +228,16 @@ class MessageProcessor:
             filename = local_time.strftime("%Y-%m-%d.md")
             should_append = True
 
-        # Try AI formatting first
-        ai_content = self._try_ai_format(message)
+        # Try AI formatting first (with existing content if available)
+        ai_content = self._try_ai_format(message, existing_content)
 
         if ai_content:
+            if existing_content:
+                # AI integrated existing + new content → overwrite the file
+                return filename, ai_content, False
+            if should_append:
+                # No existing content but append mode → strip frontmatter
+                ai_content = self._strip_frontmatter(ai_content)
             return filename, ai_content, should_append
 
         # Fallback: plain Markdown
