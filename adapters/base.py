@@ -1,8 +1,8 @@
-"""Abstract base classes for input and output adapters."""
+"""Abstract base classes for input, output, and AI adapters."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, List, Awaitable
+from typing import Callable, List, Awaitable, Optional
 
 
 @dataclass
@@ -71,5 +71,43 @@ class BaseOutputAdapter(ABC):
 
         Returns:
             True if save was successful, False otherwise
+        """
+        pass
+
+
+class BaseAIAdapter(ABC):
+    """Abstract base class for AI adapters."""
+
+    @abstractmethod
+    def __init__(self, config: dict):
+        """
+        Initialize the AI adapter.
+
+        Args:
+            config: Configuration dictionary for this adapter
+        """
+        pass
+
+    @abstractmethod
+    def is_available(self) -> bool:
+        """
+        Check if the AI service is reachable.
+
+        Returns:
+            True if the service is available
+        """
+        pass
+
+    @abstractmethod
+    def format_message(self, content: str, metadata: dict) -> Optional[str]:
+        """
+        Format a message using AI.
+
+        Args:
+            content: Raw message content
+            metadata: Message metadata (timestamp, author, channel, etc.)
+
+        Returns:
+            Formatted content string, or None if formatting failed
         """
         pass
