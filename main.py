@@ -224,6 +224,8 @@ class Bot:
         Handle incoming message.
 
         Routes to the correct save path based on channel type.
+        Fetches existing file content from GitHub so AI can integrate
+        new messages with existing notes.
 
         Args:
             message: Message data from input adapter
@@ -232,11 +234,30 @@ class Bot:
             True if message was processed successfully
         """
         try:
-            # Process message
-            filename, content, append = self.processor.process(message)
-
             # Determine save path based on channel type
             save_path = self.path_map.get(message.channel_type, "Inbox")
+
+            # Calculate filename to check for existing content
+            local_time = self.processor._convert_timezone(message.timestamp)
+            if self.processor.template == "single":
+                filename_hint = local_time.strftime("%Y-%m-%d_%H%M%S.md")
+            else:
+                filename_hint = local_time.strftime("%Y-%m-%d.md")
+
+            # Fetch existing file content for AI integration
+            existing_content = self.output.get_existing_content(
+                filename_hint, base_path=save_path
+            )
+            if existing_content:
+                logger.info(
+                    f"Found existing file {save_path}/{filename_hint}, "
+                    "passing to AI for integration"
+                )
+
+            # Process message (with existing content for AI integration)
+            filename, content, append = self.processor.process(
+                message, existing_content=existing_content
+            )
 
             logger.info(
                 f"Saving to {save_path}/{filename} "

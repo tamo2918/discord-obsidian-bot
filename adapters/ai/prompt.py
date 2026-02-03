@@ -19,6 +19,14 @@ MEMO_SYSTEM_PROMPT = """\
 - 短いメモはシンプルに、長いメモは構造化する
 - 添付画像のURLがあればそのまま残す
 
+## 既存コンテンツがある場合
+
+既存のObsidianファイルの内容が渡された場合:
+- 既存の内容と新しいメモを **統合** して1つのファイルとして返す
+- 既存のfrontmatterを維持し、必要に応じてtagsを追加する
+- 既存の内容を壊さず、新しいメモを適切な位置に追加する
+- 全体の構造を整えて、読みやすくする
+
 ## 出力例
 
 ```markdown
@@ -52,6 +60,15 @@ DIARY_SYSTEM_PROMPT = """\
 - 時系列で整理する
 - 添付画像のURLがあればそのまま残す
 - その日の出来事をまとめるような構成にする
+
+## 既存コンテンツがある場合
+
+既存のObsidian日記ファイルの内容が渡された場合:
+- 既存の日記と新しい投稿を **統合** して1つの日記ファイルとして返す
+- 既存のfrontmatterを維持し、必要に応じてtagsを追加する
+- 時系列順を保ちつつ、新しいエントリーを適切な位置に追加する
+- 既存の内容を壊さず、全体を1日の日記としてまとめる
+- 重複する内容があれば統合する
 
 ## 出力例
 
@@ -99,13 +116,18 @@ def get_system_prompt(channel_type: str) -> str:
     return SYSTEM_PROMPTS.get(channel_type, MEMO_SYSTEM_PROMPT)
 
 
-def build_user_prompt(content: str, metadata: dict) -> str:
+def build_user_prompt(
+    content: str,
+    metadata: dict,
+    existing_content: str = None,
+) -> str:
     """
     Build a user prompt from message content and metadata.
 
     Args:
         content: Raw message content
         metadata: Dict with keys like timestamp, author, channel, attachments
+        existing_content: Existing Obsidian file content to integrate with
 
     Returns:
         Formatted user prompt string
@@ -117,7 +139,18 @@ def build_user_prompt(content: str, metadata: dict) -> str:
     else:
         label = "メモ内容"
 
-    parts = [f"{label}:\n{content}"]
+    parts = []
+
+    # Include existing content first if available
+    if existing_content:
+        parts.append(f"【既存のObsidianファイル内容】:\n{existing_content}")
+        parts.append(f"【新しい{label}】:\n{content}")
+        parts.append(
+            "上記の既存ファイル内容と新しいメッセージを統合して、"
+            "1つの完成されたMarkdownファイルとして出力してください。"
+        )
+    else:
+        parts.append(f"{label}:\n{content}")
 
     if metadata.get("timestamp"):
         parts.append(f"日時: {metadata['timestamp']}")

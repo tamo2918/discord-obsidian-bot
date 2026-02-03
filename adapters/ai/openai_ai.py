@@ -38,17 +38,24 @@ class OpenAICompatibleAI(BaseAIAdapter):
             logger.debug(f"OpenAI-compatible API not reachable: {e}")
             return False
 
-    def format_message(self, content: str, metadata: dict) -> Optional[str]:
+    def format_message(
+        self,
+        content: str,
+        metadata: dict,
+        existing_content: str = None,
+    ) -> Optional[str]:
         """Format a message using OpenAI-compatible /v1/chat/completions."""
         try:
             channel_type = metadata.get("channel_type", "memo")
             system_prompt = get_system_prompt(channel_type)
 
+            user_prompt = build_user_prompt(content, metadata, existing_content)
+
             payload = {
                 "model": self.model,
                 "messages": [
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": build_user_prompt(content, metadata)},
+                    {"role": "user", "content": user_prompt},
                 ],
                 "temperature": 0.3,
             }

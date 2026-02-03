@@ -100,13 +100,19 @@ class BaseAIAdapter(ABC):
         pass
 
     @abstractmethod
-    def format_message(self, content: str, metadata: dict) -> Optional[str]:
+    def format_message(
+        self,
+        content: str,
+        metadata: dict,
+        existing_content: str = None,
+    ) -> Optional[str]:
         """
         Format a message using AI.
 
         Args:
             content: Raw message content
             metadata: Message metadata (timestamp, author, channel, etc.)
+            existing_content: Existing Obsidian file content to integrate with
 
         Returns:
             Formatted content string, or None if formatting failed
