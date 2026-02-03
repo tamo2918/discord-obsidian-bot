@@ -16,6 +16,13 @@ services:
       - GITHUB_PATH=${GITHUB_PATH:-Inbox}
       - PROCESSOR_TIMEZONE=${PROCESSOR_TIMEZONE:-Asia/Tokyo}
       - PROCESSOR_TEMPLATE=${PROCESSOR_TEMPLATE:-daily}
+      # AI formatting (optional)
+      - AI_ENABLED=${AI_ENABLED:-false}
+      - AI_PROVIDER=${AI_PROVIDER:-ollama}
+      - AI_BASE_URL=${AI_BASE_URL:-http://localhost:11434}
+      - AI_MODEL=${AI_MODEL:-gemma2}
+      - AI_API_KEY=${AI_API_KEY:-}
+      - AI_TIMEOUT=${AI_TIMEOUT:-60}
       - TZ=Asia/Tokyo
     logging:
       driver: "json-file"

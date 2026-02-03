@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import yaml
 
-from adapters.base import MessageData
+from adapters.base import BaseAIAdapter, MessageData
 from adapters.inputs.discord_input import DiscordInput
 from adapters.outputs.github_output import GitHubOutput
 from processor import MessageProcessor
@@ -88,6 +88,14 @@ def load_config_from_env() -> Dict[str, Any]:
             "timezone": os.environ.get("PROCESSOR_TIMEZONE", "Asia/Tokyo"),
             "template": os.environ.get("PROCESSOR_TEMPLATE", "daily"),
         },
+        "ai": {
+            "enabled": os.environ.get("AI_ENABLED", "false").lower() == "true",
+            "provider": os.environ.get("AI_PROVIDER", "ollama"),
+            "base_url": os.environ.get("AI_BASE_URL", "http://localhost:11434"),
+            "model": os.environ.get("AI_MODEL", "gemma2"),
+            "api_key": os.environ.get("AI_API_KEY", ""),
+            "timeout": os.environ.get("AI_TIMEOUT", "60"),
+        },
     }
 
     return config
@@ -122,6 +130,43 @@ def load_config() -> Dict[str, Any]:
     return load_config_from_env()
 
 
+def create_ai_adapter(config: Dict[str, Any]) -> Optional[BaseAIAdapter]:
+    """
+    Create an AI adapter based on configuration.
+
+    Args:
+        config: AI configuration dictionary
+
+    Returns:
+        AI adapter instance, or None if AI is disabled
+    """
+    if not config.get("enabled", False):
+        logger.info("AI formatting is disabled")
+        return None
+
+    provider = config.get("provider", "ollama")
+
+    if provider == "ollama":
+        from adapters.ai.ollama_ai import OllamaAI
+        adapter = OllamaAI(config)
+        logger.info(
+            f"AI adapter: Ollama (url={config.get('base_url')}, "
+            f"model={config.get('model')})"
+        )
+    elif provider == "openai":
+        from adapters.ai.openai_ai import OpenAICompatibleAI
+        adapter = OpenAICompatibleAI(config)
+        logger.info(
+            f"AI adapter: OpenAI-compatible (url={config.get('base_url')}, "
+            f"model={config.get('model')})"
+        )
+    else:
+        logger.warning(f"Unknown AI provider '{provider}', AI disabled")
+        return None
+
+    return adapter
+
+
 class Bot:
     """Main bot class that coordinates input, processing, and output."""
 
@@ -134,8 +179,11 @@ class Bot:
         """
         self.config = config
 
-        # Initialize processor
-        self.processor = MessageProcessor(config.get("processor", {}))
+        # Initialize AI adapter (optional)
+        ai_adapter = create_ai_adapter(config.get("ai", {}))
+
+        # Initialize processor (with optional AI)
+        self.processor = MessageProcessor(config.get("processor", {}), ai_adapter)
 
         # Initialize output adapter
         self.output = GitHubOutput(config["github"])
