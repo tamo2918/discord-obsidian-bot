@@ -11,3 +11,8 @@ services:
       - TZ=Asia/Tokyo
     volumes:
       - ./config.yaml:/app/config.yaml:ro
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
