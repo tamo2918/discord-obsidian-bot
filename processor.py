@@ -192,10 +192,27 @@ class MessageProcessor:
                 return body
         return stripped
 
+    def extract_book_title(self, content: str) -> Optional[str]:
+        """
+        Extract a book title from message content using AI.
+
+        Args:
+            content: Raw message content
+
+        Returns:
+            Book title string, or None if AI unavailable or extraction failed
+        """
+        if not self.ai:
+            return None
+        if not self.ai.is_available():
+            return None
+        return self.ai.extract_book_title(content)
+
     def process(
         self,
         message: MessageData,
         existing_content: str = None,
+        book_title: str = None,
     ) -> Tuple[str, str, bool]:
         """
         Process a message and return filename and content.
@@ -205,12 +222,16 @@ class MessageProcessor:
         with existing file content (returning a complete file to overwrite).
         Otherwise falls back to plain Markdown templates.
 
+        For reading channel type, book_title determines the filename
+        (e.g. "Clean Code.md") and content is always overwritten.
+
         For daily (append) mode without existing content, frontmatter is
         stripped from AI output to prevent duplicates.
 
         Args:
             message: Message data to process
             existing_content: Existing Obsidian file content for AI integration
+            book_title: Book title for reading channel (determines filename)
 
         Returns:
             Tuple of (filename, content, should_append)
@@ -218,9 +239,21 @@ class MessageProcessor:
         """
         logger.debug(f"Processing message with template: {self.template}")
 
-        # Determine filename based on template
         local_time = self._convert_timezone(message.timestamp)
 
+        # Reading channel: filename = book title, always overwrite
+        if message.channel_type == "reading" and book_title:
+            filename = f"{book_title}.md"
+
+            ai_content = self._try_ai_format(message, existing_content)
+            if ai_content:
+                return filename, ai_content, False
+
+            # Fallback: plain markdown with book title
+            _, content = self._process_single(message)
+            return filename, content, False
+
+        # Determine filename based on template
         if self.template == "single":
             filename = local_time.strftime("%Y-%m-%d_%H%M%S.md")
             should_append = False

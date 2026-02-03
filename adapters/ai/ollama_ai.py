@@ -4,7 +4,7 @@ from typing import Optional
 
 import requests
 
-from adapters.ai.prompt import get_system_prompt, build_user_prompt
+from adapters.ai.prompt import get_system_prompt, build_user_prompt, BOOK_TITLE_EXTRACTION_PROMPT
 from adapters.base import BaseAIAdapter
 
 logger = logging.getLogger(__name__)
@@ -98,4 +98,40 @@ class OllamaAI(BaseAIAdapter):
             return None
         except Exception as e:
             logger.error(f"Unexpected error in Ollama adapter: {e}")
+            return None
+
+    def extract_book_title(self, content: str) -> Optional[str]:
+        """Extract a book title from message content using Ollama."""
+        try:
+            payload = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": BOOK_TITLE_EXTRACTION_PROMPT},
+                    {"role": "user", "content": content},
+                ],
+                "stream": False,
+                "options": {"temperature": 0.0},
+            }
+
+            resp = requests.post(
+                f"{self.base_url}/api/chat",
+                json=payload,
+                timeout=30,
+            )
+
+            if resp.status_code != 200:
+                logger.error(f"Ollama title extraction error: {resp.status_code}")
+                return None
+
+            title = resp.json().get("message", {}).get("content", "").strip()
+
+            if not title or title == "不明":
+                logger.info("Could not extract book title from message")
+                return None
+
+            logger.info(f"Extracted book title: {title}")
+            return title
+
+        except Exception as e:
+            logger.error(f"Book title extraction failed: {e}")
             return None
