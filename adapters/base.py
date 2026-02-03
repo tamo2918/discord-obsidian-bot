@@ -14,6 +14,7 @@ class MessageData:
     timestamp: datetime
     channel: str
     attachments: List[str]
+    channel_type: str = "memo"
 
 
 class BaseInputAdapter(ABC):

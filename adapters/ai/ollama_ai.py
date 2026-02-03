@@ -4,7 +4,7 @@ from typing import Optional
 
 import requests
 
-from adapters.ai.prompt import SYSTEM_PROMPT, build_user_prompt
+from adapters.ai.prompt import get_system_prompt, build_user_prompt
 from adapters.base import BaseAIAdapter
 
 logger = logging.getLogger(__name__)
@@ -48,10 +48,13 @@ class OllamaAI(BaseAIAdapter):
     def format_message(self, content: str, metadata: dict) -> Optional[str]:
         """Format a message using Ollama's /api/chat endpoint."""
         try:
+            channel_type = metadata.get("channel_type", "memo")
+            system_prompt = get_system_prompt(channel_type)
+
             payload = {
                 "model": self.model,
                 "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": build_user_prompt(content, metadata)},
                 ],
                 "stream": False,

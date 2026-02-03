@@ -1,6 +1,9 @@
 """Shared prompt templates for AI adapters."""
 
-SYSTEM_PROMPT = """\
+# ------------------------------------------------------------------
+# メモ用プロンプト
+# ------------------------------------------------------------------
+MEMO_SYSTEM_PROMPT = """\
 あなたはObsidianノート作成アシスタントです。
 ユーザーのメモを、Obsidian Markdownフォーマットに整形して返してください。
 
@@ -30,6 +33,71 @@ tags:
 ```\
 """
 
+# ------------------------------------------------------------------
+# 日記用プロンプト
+# ------------------------------------------------------------------
+DIARY_SYSTEM_PROMPT = """\
+あなたはObsidian日記作成アシスタントです。
+ユーザーの投稿を、日記エントリーとして整形して返してください。
+
+## ルール
+
+- **Markdownのみ**を返す（説明や前置きは不要）
+- YAML frontmatter を先頭に付ける:
+  - date: 日記の日時
+  - tags: 内容に合ったタグをリスト形式で（3個程度）
+  - type: diary
+- 日記らしい文体で整える（一人称視点、感情や感想を残す）
+- 元の意味やニュアンスを変えない
+- 時系列で整理する
+- 添付画像のURLがあればそのまま残す
+- その日の出来事をまとめるような構成にする
+
+## 出力例
+
+```markdown
+---
+date: 2026-01-15
+tags:
+  - 食事
+  - 渋谷
+  - 外出
+type: diary
+---
+
+## 今日のできごと
+
+渋谷に出かけて、前から気になっていたラーメン屋に行った。
+味噌ベースのスープが濃厚で、チャーシューも柔らかくてとても美味しかった。
+
+また行きたいと思う。
+```\
+"""
+
+# ------------------------------------------------------------------
+# プロンプトの選択
+# ------------------------------------------------------------------
+SYSTEM_PROMPTS = {
+    "memo": MEMO_SYSTEM_PROMPT,
+    "diary": DIARY_SYSTEM_PROMPT,
+}
+
+# 後方互換のために残す
+SYSTEM_PROMPT = MEMO_SYSTEM_PROMPT
+
+
+def get_system_prompt(channel_type: str) -> str:
+    """
+    Get the system prompt for a given channel type.
+
+    Args:
+        channel_type: Type of channel ("memo", "diary", etc.)
+
+    Returns:
+        System prompt string (defaults to memo if type is unknown)
+    """
+    return SYSTEM_PROMPTS.get(channel_type, MEMO_SYSTEM_PROMPT)
+
 
 def build_user_prompt(content: str, metadata: dict) -> str:
     """
@@ -42,7 +110,14 @@ def build_user_prompt(content: str, metadata: dict) -> str:
     Returns:
         Formatted user prompt string
     """
-    parts = [f"メモ内容:\n{content}"]
+    channel_type = metadata.get("channel_type", "memo")
+
+    if channel_type == "diary":
+        label = "日記の内容"
+    else:
+        label = "メモ内容"
+
+    parts = [f"{label}:\n{content}"]
 
     if metadata.get("timestamp"):
         parts.append(f"日時: {metadata['timestamp']}")

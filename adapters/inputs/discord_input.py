@@ -22,12 +22,20 @@ class DiscordInput(BaseInputAdapter):
         Initialize the Discord input adapter.
 
         Args:
-            config: Discord configuration containing token and channels
+            config: Discord configuration containing token and channel_map
             on_message_callback: Async callback to handle received messages
         """
         self.token = config["token"]
-        self.channels: List[str] = config["channels"]
         self.on_message_callback = on_message_callback
+
+        # channel_map: {"channel_id": "type"} e.g. {"123": "memo", "456": "diary"}
+        # Backward compatible: "channels" list is treated as memo type
+        if "channel_map" in config:
+            self.channel_map: dict = config["channel_map"]
+        else:
+            self.channel_map = {ch: "memo" for ch in config.get("channels", [])}
+
+        self.channels: List[str] = list(self.channel_map.keys())
 
         # Set up intents
         intents = Intents.default()
@@ -69,6 +77,9 @@ class DiscordInput(BaseInputAdapter):
             f"in #{message.channel.name}: {message.content[:50]}..."
         )
 
+        # Determine channel type from map
+        channel_type = self.channel_map.get(str(message.channel.id), "memo")
+
         # Extract message data
         message_data = MessageData(
             content=message.content,
@@ -76,6 +87,7 @@ class DiscordInput(BaseInputAdapter):
             timestamp=message.created_at,
             channel=message.channel.name,
             attachments=[att.url for att in message.attachments],
+            channel_type=channel_type,
         )
 
         try:

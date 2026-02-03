@@ -9,11 +9,17 @@ services:
       # Required
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
-      - DISCORD_CHANNELS=${DISCORD_CHANNELS}
       - GITHUB_REPO=${GITHUB_REPO}
-      # Optional (with defaults)
+      # Channel configuration (at least one required)
+      - CHANNEL_MEMO=${CHANNEL_MEMO:-}
+      - CHANNEL_DIARY=${CHANNEL_DIARY:-}
+      - DISCORD_CHANNELS=${DISCORD_CHANNELS:-}
+      # Path configuration
       - GITHUB_BRANCH=${GITHUB_BRANCH:-main}
       - GITHUB_PATH=${GITHUB_PATH:-Inbox}
+      - GITHUB_PATH_MEMO=${GITHUB_PATH_MEMO:-Inbox}
+      - GITHUB_PATH_DIARY=${GITHUB_PATH_DIARY:-Diary}
+      # Processor
       - PROCESSOR_TIMEZONE=${PROCESSOR_TIMEZONE:-Asia/Tokyo}
       - PROCESSOR_TEMPLATE=${PROCESSOR_TEMPLATE:-daily}
       # AI formatting (optional)
