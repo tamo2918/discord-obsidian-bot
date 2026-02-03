@@ -158,12 +158,38 @@ class MessageProcessor:
 
         return result
 
+    @staticmethod
+    def _strip_frontmatter(content: str) -> str:
+        """
+        Remove YAML frontmatter from content.
+
+        When appending to an existing daily file, the AI-generated
+        frontmatter must be stripped to avoid duplicates.
+
+        Args:
+            content: Markdown content possibly starting with frontmatter
+
+        Returns:
+            Content without frontmatter
+        """
+        stripped = content.strip()
+        if stripped.startswith("---"):
+            # Find the closing ---
+            end = stripped.find("---", 3)
+            if end != -1:
+                body = stripped[end + 3:].strip()
+                return body
+        return stripped
+
     def process(self, message: MessageData) -> Tuple[str, str, bool]:
         """
         Process a message and return filename and content.
 
         If AI is configured and available, uses AI to format the content.
         Otherwise falls back to plain Markdown templates.
+
+        For daily (append) mode, frontmatter is stripped from AI output
+        to prevent duplicates when multiple messages are saved per day.
 
         Args:
             message: Message data to process
@@ -188,6 +214,9 @@ class MessageProcessor:
         ai_content = self._try_ai_format(message)
 
         if ai_content:
+            if should_append:
+                # Strip frontmatter for append mode to avoid duplicates
+                ai_content = self._strip_frontmatter(ai_content)
             return filename, ai_content, should_append
 
         # Fallback: plain Markdown
