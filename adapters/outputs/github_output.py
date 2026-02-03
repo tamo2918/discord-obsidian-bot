@@ -103,7 +103,13 @@ class GitHubOutput:
             )
             return False
 
-    def save(self, filename: str, content: str, append: bool = False) -> bool:
+    def save(
+        self,
+        filename: str,
+        content: str,
+        append: bool = False,
+        base_path: str = None,
+    ) -> bool:
         """
         Save content to a file in the GitHub repository.
 
@@ -111,11 +117,15 @@ class GitHubOutput:
             filename: Name of the file to save
             content: Content to save
             append: If True, append to existing file; otherwise overwrite
+            base_path: Override base path (e.g. "Diary" instead of default "Inbox")
 
         Returns:
             True if save was successful, False otherwise
         """
-        filepath = self._get_file_path(filename)
+        if base_path is not None:
+            filepath = f"{base_path}/{filename}" if base_path else filename
+        else:
+            filepath = self._get_file_path(filename)
         max_retries = 3
 
         for attempt in range(max_retries):

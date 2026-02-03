@@ -146,6 +146,7 @@ class MessageProcessor:
             "author": message.author,
             "channel": message.channel,
             "attachments": message.attachments,
+            "channel_type": message.channel_type,
         }
 
         result = self.ai.format_message(message.content, metadata)

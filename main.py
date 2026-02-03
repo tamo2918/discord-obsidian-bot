@@ -50,33 +50,54 @@ def load_config_from_file(config_path: str) -> Dict[str, Any]:
     return yaml.safe_load(content)
 
 
+def _parse_channels(env_value: str) -> list:
+    """Parse comma-separated channel IDs into a list."""
+    return [ch.strip() for ch in env_value.split(",") if ch.strip()]
+
+
 def load_config_from_env() -> Dict[str, Any]:
     """
     Load configuration from environment variables.
 
-    Required environment variables:
-        - DISCORD_TOKEN: Discord bot token
-        - GITHUB_TOKEN: GitHub personal access token
-        - DISCORD_CHANNELS: Comma-separated list of channel IDs to monitor
+    Channel configuration (at least one required):
+        - CHANNEL_MEMO: Comma-separated memo channel IDs
+        - CHANNEL_DIARY: Comma-separated diary channel IDs
+        - DISCORD_CHANNELS: (Backward compat) treated as memo channels
 
-    Optional environment variables:
-        - GITHUB_REPO: GitHub repository (default: required)
-        - GITHUB_BRANCH: GitHub branch (default: main)
-        - GITHUB_PATH: Path in repository (default: Inbox)
-        - PROCESSOR_TIMEZONE: Timezone (default: Asia/Tokyo)
-        - PROCESSOR_TEMPLATE: Template type (default: daily)
+    Path configuration:
+        - GITHUB_PATH_MEMO: Save path for memos (default: Inbox)
+        - GITHUB_PATH_DIARY: Save path for diary (default: Diary)
 
     Returns:
         Configuration dictionary
     """
-    # Parse channel IDs from comma-separated string
-    channels_str = os.environ.get("DISCORD_CHANNELS", "")
-    channels = [ch.strip() for ch in channels_str.split(",") if ch.strip()]
+    # Build channel_map: {channel_id: type}
+    channel_map: Dict[str, str] = {}
+
+    # Memo channels (CHANNEL_MEMO or fallback to DISCORD_CHANNELS)
+    memo_channels = _parse_channels(os.environ.get("CHANNEL_MEMO", ""))
+    if not memo_channels:
+        memo_channels = _parse_channels(os.environ.get("DISCORD_CHANNELS", ""))
+    for ch in memo_channels:
+        channel_map[ch] = "memo"
+
+    # Diary channels
+    diary_channels = _parse_channels(os.environ.get("CHANNEL_DIARY", ""))
+    for ch in diary_channels:
+        channel_map[ch] = "diary"
+
+    # Path map: channel_type -> save path
+    path_map = {
+        "memo": os.environ.get(
+            "GITHUB_PATH_MEMO", os.environ.get("GITHUB_PATH", "Inbox")
+        ),
+        "diary": os.environ.get("GITHUB_PATH_DIARY", "Diary"),
+    }
 
     config = {
         "discord": {
             "token": os.environ.get("DISCORD_TOKEN", ""),
-            "channels": channels,
+            "channel_map": channel_map,
         },
         "github": {
             "token": os.environ.get("GITHUB_TOKEN", ""),
@@ -84,6 +105,7 @@ def load_config_from_env() -> Dict[str, Any]:
             "branch": os.environ.get("GITHUB_BRANCH", "main"),
             "path": os.environ.get("GITHUB_PATH", "Inbox"),
         },
+        "path_map": path_map,
         "processor": {
             "timezone": os.environ.get("PROCESSOR_TIMEZONE", "Asia/Tokyo"),
             "template": os.environ.get("PROCESSOR_TEMPLATE", "daily"),
@@ -179,6 +201,9 @@ class Bot:
         """
         self.config = config
 
+        # Path map: channel_type -> save path (e.g. {"memo": "Inbox", "diary": "Diary"})
+        self.path_map = config.get("path_map", {"memo": "Inbox"})
+
         # Initialize AI adapter (optional)
         ai_adapter = create_ai_adapter(config.get("ai", {}))
 
@@ -198,6 +223,8 @@ class Bot:
         """
         Handle incoming message.
 
+        Routes to the correct save path based on channel type.
+
         Args:
             message: Message data from input adapter
 
@@ -208,10 +235,18 @@ class Bot:
             # Process message
             filename, content, append = self.processor.process(message)
 
-            logger.info(f"Saving to {filename} (append={append})")
+            # Determine save path based on channel type
+            save_path = self.path_map.get(message.channel_type, "Inbox")
+
+            logger.info(
+                f"Saving to {save_path}/{filename} "
+                f"(type={message.channel_type}, append={append})"
+            )
 
             # Save to output
-            success = self.output.save(filename, content, append=append)
+            success = self.output.save(
+                filename, content, append=append, base_path=save_path
+            )
 
             return success
         except Exception as e:
@@ -239,8 +274,17 @@ async def main():
         logger.error("Discord token is required (set DISCORD_TOKEN)")
         sys.exit(1)
 
-    if not config.get("discord", {}).get("channels"):
-        logger.error("Discord channels are required (set DISCORD_CHANNELS)")
+    # Check for channels (either channel_map or channels list)
+    discord_cfg = config.get("discord", {})
+    has_channels = (
+        discord_cfg.get("channel_map")
+        or discord_cfg.get("channels")
+    )
+    if not has_channels:
+        logger.error(
+            "Discord channels are required "
+            "(set CHANNEL_MEMO, CHANNEL_DIARY, or DISCORD_CHANNELS)"
+        )
         sys.exit(1)
 
     if not config.get("github", {}).get("token"):
