@@ -118,3 +118,16 @@ class BaseAIAdapter(ABC):
             Formatted content string, or None if formatting failed
         """
         pass
+
+    @abstractmethod
+    def extract_book_title(self, content: str) -> Optional[str]:
+        """
+        Extract a book title from message content.
+
+        Args:
+            content: Raw message content mentioning a book
+
+        Returns:
+            Book title string, or None if extraction failed
+        """
+        pass
