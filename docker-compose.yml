@@ -6,11 +6,17 @@ services:
     container_name: discord-obsidian-bot
     restart: unless-stopped
     environment:
+      # Required
       - DISCORD_TOKEN=${DISCORD_TOKEN}
       - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - DISCORD_CHANNELS=${DISCORD_CHANNELS}
+      - GITHUB_REPO=${GITHUB_REPO}
+      # Optional (with defaults)
+      - GITHUB_BRANCH=${GITHUB_BRANCH:-main}
+      - GITHUB_PATH=${GITHUB_PATH:-Inbox}
+      - PROCESSOR_TIMEZONE=${PROCESSOR_TIMEZONE:-Asia/Tokyo}
+      - PROCESSOR_TEMPLATE=${PROCESSOR_TEMPLATE:-daily}
       - TZ=Asia/Tokyo
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
     logging:
       driver: "json-file"
       options:

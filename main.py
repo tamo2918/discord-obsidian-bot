@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import sys
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import yaml
 
@@ -21,7 +21,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def load_config(config_path: str) -> Dict[str, Any]:
+def load_config_from_file(config_path: str) -> Dict[str, Any]:
     """
     Load configuration from YAML file.
 
@@ -48,6 +48,78 @@ def load_config(config_path: str) -> Dict[str, Any]:
     content = re.sub(r"\$\{(\w+)\}", replace_env_var, content)
 
     return yaml.safe_load(content)
+
+
+def load_config_from_env() -> Dict[str, Any]:
+    """
+    Load configuration from environment variables.
+
+    Required environment variables:
+        - DISCORD_TOKEN: Discord bot token
+        - GITHUB_TOKEN: GitHub personal access token
+        - DISCORD_CHANNELS: Comma-separated list of channel IDs to monitor
+
+    Optional environment variables:
+        - GITHUB_REPO: GitHub repository (default: required)
+        - GITHUB_BRANCH: GitHub branch (default: main)
+        - GITHUB_PATH: Path in repository (default: Inbox)
+        - PROCESSOR_TIMEZONE: Timezone (default: Asia/Tokyo)
+        - PROCESSOR_TEMPLATE: Template type (default: daily)
+
+    Returns:
+        Configuration dictionary
+    """
+    # Parse channel IDs from comma-separated string
+    channels_str = os.environ.get("DISCORD_CHANNELS", "")
+    channels = [ch.strip() for ch in channels_str.split(",") if ch.strip()]
+
+    config = {
+        "discord": {
+            "token": os.environ.get("DISCORD_TOKEN", ""),
+            "channels": channels,
+        },
+        "github": {
+            "token": os.environ.get("GITHUB_TOKEN", ""),
+            "repo": os.environ.get("GITHUB_REPO", ""),
+            "branch": os.environ.get("GITHUB_BRANCH", "main"),
+            "path": os.environ.get("GITHUB_PATH", "Inbox"),
+        },
+        "processor": {
+            "timezone": os.environ.get("PROCESSOR_TIMEZONE", "Asia/Tokyo"),
+            "template": os.environ.get("PROCESSOR_TEMPLATE", "daily"),
+        },
+    }
+
+    return config
+
+
+def load_config() -> Dict[str, Any]:
+    """
+    Load configuration from file or environment variables.
+
+    First tries to load from config.yaml file, then falls back to
+    environment variables if the file is not found.
+
+    Returns:
+        Configuration dictionary
+    """
+    # Check for config file
+    config_path = os.environ.get("CONFIG_PATH", "/app/config.yaml")
+
+    # For local development, check current directory
+    if not os.path.exists(config_path):
+        local_config = "config.yaml"
+        if os.path.exists(local_config):
+            config_path = local_config
+
+    # Try to load from file first
+    if os.path.exists(config_path):
+        logger.info(f"Loading configuration from {config_path}")
+        return load_config_from_file(config_path)
+
+    # Fall back to environment variables
+    logger.info("Config file not found, loading from environment variables")
+    return load_config_from_env()
 
 
 class Bot:
@@ -111,28 +183,24 @@ class Bot:
 
 async def main():
     """Main entry point."""
-    # Get config path from environment or use default
-    config_path = os.environ.get("CONFIG_PATH", "/app/config.yaml")
-
-    # For local development, check current directory
-    if not os.path.exists(config_path):
-        local_config = "config.yaml"
-        if os.path.exists(local_config):
-            config_path = local_config
-        else:
-            logger.error(f"Configuration file not found: {config_path}")
-            sys.exit(1)
-
-    logger.info(f"Loading configuration from {config_path}")
-    config = load_config(config_path)
+    # Load configuration (from file or environment variables)
+    config = load_config()
 
     # Validate required configuration
     if not config.get("discord", {}).get("token"):
-        logger.error("Discord token is required")
+        logger.error("Discord token is required (set DISCORD_TOKEN)")
+        sys.exit(1)
+
+    if not config.get("discord", {}).get("channels"):
+        logger.error("Discord channels are required (set DISCORD_CHANNELS)")
         sys.exit(1)
 
     if not config.get("github", {}).get("token"):
-        logger.error("GitHub token is required")
+        logger.error("GitHub token is required (set GITHUB_TOKEN)")
+        sys.exit(1)
+
+    if not config.get("github", {}).get("repo"):
+        logger.error("GitHub repo is required (set GITHUB_REPO)")
         sys.exit(1)
 
     # Create and run bot
