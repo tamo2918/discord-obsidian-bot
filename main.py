@@ -62,11 +62,13 @@ def load_config_from_env() -> Dict[str, Any]:
     Channel configuration (at least one required):
         - CHANNEL_MEMO: Comma-separated memo channel IDs
         - CHANNEL_DIARY: Comma-separated diary channel IDs
+        - CHANNEL_READING: Comma-separated reading channel IDs
         - DISCORD_CHANNELS: (Backward compat) treated as memo channels
 
     Path configuration:
         - GITHUB_PATH_MEMO: Save path for memos (default: Inbox)
         - GITHUB_PATH_DIARY: Save path for diary (default: Diary)
+        - GITHUB_PATH_READING: Save path for reading notes (default: Reading)
 
     Returns:
         Configuration dictionary
@@ -86,12 +88,18 @@ def load_config_from_env() -> Dict[str, Any]:
     for ch in diary_channels:
         channel_map[ch] = "diary"
 
+    # Reading channels
+    reading_channels = _parse_channels(os.environ.get("CHANNEL_READING", ""))
+    for ch in reading_channels:
+        channel_map[ch] = "reading"
+
     # Path map: channel_type -> save path
     path_map = {
         "memo": os.environ.get(
             "GITHUB_PATH_MEMO", os.environ.get("GITHUB_PATH", "Inbox")
         ),
         "diary": os.environ.get("GITHUB_PATH_DIARY", "Diary"),
+        "reading": os.environ.get("GITHUB_PATH_READING", "Reading"),
     }
 
     config = {
@@ -227,6 +235,9 @@ class Bot:
         Fetches existing file content from GitHub so AI can integrate
         new messages with existing notes.
 
+        For reading channels, extracts the book title first to determine
+        the filename, then fetches existing book note for integration.
+
         Args:
             message: Message data from input adapter
 
@@ -237,26 +248,50 @@ class Bot:
             # Determine save path based on channel type
             save_path = self.path_map.get(message.channel_type, "Inbox")
 
-            # Calculate filename to check for existing content
-            local_time = self.processor._convert_timezone(message.timestamp)
-            if self.processor.template == "single":
-                filename_hint = local_time.strftime("%Y-%m-%d_%H%M%S.md")
+            book_title = None
+            existing_content = None
+
+            if message.channel_type == "reading":
+                # Reading channel: extract book title → use as filename
+                book_title = self.processor.extract_book_title(message.content)
+
+                if book_title:
+                    filename_hint = f"{book_title}.md"
+                    existing_content = self.output.get_existing_content(
+                        filename_hint, base_path=save_path
+                    )
+                    if existing_content:
+                        logger.info(
+                            f"Found existing book note {save_path}/{filename_hint}, "
+                            "passing to AI for integration"
+                        )
+                else:
+                    logger.warning(
+                        "Could not extract book title, "
+                        "falling back to date-based filename"
+                    )
             else:
-                filename_hint = local_time.strftime("%Y-%m-%d.md")
+                # Memo/Diary: date-based filename
+                local_time = self.processor._convert_timezone(message.timestamp)
+                if self.processor.template == "single":
+                    filename_hint = local_time.strftime("%Y-%m-%d_%H%M%S.md")
+                else:
+                    filename_hint = local_time.strftime("%Y-%m-%d.md")
 
-            # Fetch existing file content for AI integration
-            existing_content = self.output.get_existing_content(
-                filename_hint, base_path=save_path
-            )
-            if existing_content:
-                logger.info(
-                    f"Found existing file {save_path}/{filename_hint}, "
-                    "passing to AI for integration"
+                existing_content = self.output.get_existing_content(
+                    filename_hint, base_path=save_path
                 )
+                if existing_content:
+                    logger.info(
+                        f"Found existing file {save_path}/{filename_hint}, "
+                        "passing to AI for integration"
+                    )
 
-            # Process message (with existing content for AI integration)
+            # Process message
             filename, content, append = self.processor.process(
-                message, existing_content=existing_content
+                message,
+                existing_content=existing_content,
+                book_title=book_title,
             )
 
             logger.info(
@@ -304,7 +339,8 @@ async def main():
     if not has_channels:
         logger.error(
             "Discord channels are required "
-            "(set CHANNEL_MEMO, CHANNEL_DIARY, or DISCORD_CHANNELS)"
+            "(set CHANNEL_MEMO, CHANNEL_DIARY, CHANNEL_READING, "
+            "or DISCORD_CHANNELS)"
         )
         sys.exit(1)
 
