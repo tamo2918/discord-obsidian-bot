@@ -1,0 +1,20 @@
+# Discord設定
+discord:
+  token: "${DISCORD_TOKEN}"          # 環境変数から取得
+  channels:
+    - "1468055959707320586"          # 監視対象チャンネルID（複数指定可）
+
+# GitHub設定
+github:
+  token: "${GITHUB_TOKEN}"           # 環境変数から取得
+  repo: "tamo2918/ObsidianVault"     # リポジトリ名（owner/repo形式）
+  branch: "main"                      # ブランチ名
+  path: "Inbox"                       # 保存先フォルダ
+
+# メッセージ処理設定
+processor:
+  timezone: "Asia/Tokyo"
+  template: "daily"                   # daily | single
+
+  # daily: 日付ごとに1ファイル（追記モード）
+  # single: 1メッセージ1ファイル

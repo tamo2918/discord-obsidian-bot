@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  memo-bot:
+    build: .
+    container_name: discord-obsidian-bot
+    restart: unless-stopped
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - TZ=Asia/Tokyo
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
