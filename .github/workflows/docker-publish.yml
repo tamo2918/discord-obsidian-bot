@@ -2,12 +2,14 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [main]
+    branches: [main, claude/discord-obsidian-bot-*]
     tags: ['v*']
+  workflow_dispatch:  # 手動実行を追加
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+
 
 jobs:
   build-and-push:
