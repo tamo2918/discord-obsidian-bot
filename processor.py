@@ -1,7 +1,8 @@
 """Message processor for converting messages to Markdown format."""
 import logging
+import re
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import pytz
 
@@ -234,6 +235,28 @@ class MessageProcessor:
         )
 
     @staticmethod
+    def _split_todo_items(text: str) -> List[str]:
+        """
+        Split a casual message into individual kanban card lines.
+
+        Splits on Japanese comma (、), English comma (,), and newlines.
+        Each item is trimmed and empty items are discarded.
+
+        Args:
+            text: Raw message text from Discord
+
+        Returns:
+            List of kanban card lines (e.g. ["- [ ] task1", "- [ ] task2"])
+        """
+        items = re.split(r"[、,\n]+", text)
+        cards = []
+        for item in items:
+            item = item.strip()
+            if item:
+                cards.append(f"- [ ] {item}")
+        return cards if cards else [f"- [ ] {text.strip()}"]
+
+    @staticmethod
     def _insert_kanban_card(board_content: str, card: str) -> str:
         """
         Insert a new card into the Inbox lane of an existing Kanban board.
@@ -335,14 +358,15 @@ class MessageProcessor:
             if ai_content:
                 return filename, ai_content, False
 
-            # Fallback: append as plain kanban card to Inbox
-            new_card = f"- [ ] {message.content}"
+            # Fallback: split by comma/newline and append as kanban cards to Inbox
+            cards = self._split_todo_items(message.content)
 
             if existing_content:
-                # Insert new card into Inbox lane of existing board
-                content = self._insert_kanban_card(existing_content, new_card)
+                content = existing_content
+                for card in cards:
+                    content = self._insert_kanban_card(content, card)
             else:
-                content = self._new_kanban_board(new_card)
+                content = self._new_kanban_board("\n".join(cards))
 
             return filename, content, False
 
