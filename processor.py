@@ -236,10 +236,10 @@ class MessageProcessor:
     @staticmethod
     def _insert_kanban_card(board_content: str, card: str) -> str:
         """
-        Insert a new card into the Backlog lane of an existing Kanban board.
+        Insert a new card into the Inbox lane of an existing Kanban board.
 
-        Finds the "## Backlog" heading and appends the card after existing
-        cards in that lane (before the next ## heading).
+        Finds the heading containing "Inbox" and appends the card after
+        existing cards in that lane (before the next ## heading).
 
         Args:
             board_content: Existing Kanban board Markdown
@@ -251,28 +251,29 @@ class MessageProcessor:
         lines = board_content.split("\n")
         result = []
         inserted = False
-        in_backlog = False
+        in_inbox = False
 
-        for i, line in enumerate(lines):
-            # Detect Backlog lane
-            if line.strip() == "## Backlog":
-                in_backlog = True
+        for line in lines:
+            stripped = line.strip()
+
+            # Detect Inbox lane (e.g. "## 🧠 Inbox", "## Inbox")
+            if stripped.startswith("## ") and "Inbox" in stripped:
+                in_inbox = True
                 result.append(line)
                 continue
 
-            # Detect next lane (end of Backlog)
-            if in_backlog and line.strip().startswith("## "):
-                # Insert card before the next lane heading
+            # Detect next lane (end of Inbox)
+            if in_inbox and stripped.startswith("## "):
                 if not inserted:
                     result.append(card)
                     result.append("")
                     inserted = True
-                in_backlog = False
+                in_inbox = False
 
             result.append(line)
 
-        # If Backlog was the last section (shouldn't happen with proper format)
-        if in_backlog and not inserted:
+        # If Inbox was the last section
+        if in_inbox and not inserted:
             result.append(card)
 
         return "\n".join(result)
@@ -334,12 +335,11 @@ class MessageProcessor:
             if ai_content:
                 return filename, ai_content, False
 
-            # Fallback: append as plain kanban card to Backlog
-            date_str = local_time.strftime("%Y-%m-%d")
-            new_card = f"- [ ] {message.content} @{{{date_str}}}"
+            # Fallback: append as plain kanban card to Inbox
+            new_card = f"- [ ] {message.content}"
 
             if existing_content:
-                # Insert new card into Backlog lane of existing board
+                # Insert new card into Inbox lane of existing board
                 content = self._insert_kanban_card(existing_content, new_card)
             else:
                 content = self._new_kanban_board(new_card)
