@@ -1,5 +1,6 @@
 """Main entry point for Discord-Obsidian Bot."""
 import asyncio
+import collections
 import logging
 import os
 import re
@@ -229,22 +230,71 @@ class Bot:
         # Initialize output adapter
         self.output = GitHubOutput(config["github"])
 
+        # Per-file locks to serialize concurrent writes to the same file
+        self._file_locks: Dict[str, asyncio.Lock] = collections.defaultdict(
+            asyncio.Lock
+        )
+
         # Initialize input adapter
         self.input = DiscordInput(
             config["discord"],
             on_message_callback=self._handle_message,
         )
 
+    def _resolve_file_key(self, message: MessageData) -> str:
+        """
+        Resolve the lock key (save_path/filename) for a message.
+
+        This determines which file the message will be written to,
+        so that concurrent writes to the same file are serialized.
+
+        Args:
+            message: Message data from input adapter
+
+        Returns:
+            A string key like "Todo/TODO.md" or "Inbox/2026-02-04.md"
+        """
+        save_path = self.path_map.get(message.channel_type, "Inbox")
+
+        if message.channel_type == "todo":
+            return f"{save_path}/TODO.md"
+
+        if message.channel_type == "reading":
+            book_title = self.processor.extract_book_title(message.content)
+            if book_title:
+                return f"{save_path}/{book_title}.md"
+
+        # Memo/Diary and reading fallback: date-based
+        local_time = self.processor._convert_timezone(message.timestamp)
+        if self.processor.template == "single":
+            return f"{save_path}/{local_time.strftime('%Y-%m-%d_%H%M%S.md')}"
+        return f"{save_path}/{local_time.strftime('%Y-%m-%d.md')}"
+
     async def _handle_message(self, message: MessageData) -> bool:
         """
         Handle incoming message.
 
-        Routes to the correct save path based on channel type.
-        Fetches existing file content from GitHub so AI can integrate
-        new messages with existing notes.
+        Uses a per-file lock to serialize concurrent writes to the same
+        file (e.g. multiple todo messages to TODO.md).
 
-        For reading channels, extracts the book title first to determine
-        the filename, then fetches existing book note for integration.
+        Args:
+            message: Message data from input adapter
+
+        Returns:
+            True if message was processed successfully
+        """
+        file_key = self._resolve_file_key(message)
+        lock = self._file_locks[file_key]
+
+        async with lock:
+            return await self._process_and_save(message)
+
+    async def _process_and_save(self, message: MessageData) -> bool:
+        """
+        Fetch existing content, process message, and save to GitHub.
+
+        This method runs inside a per-file lock so that concurrent
+        messages targeting the same file are processed sequentially.
 
         Args:
             message: Message data from input adapter
