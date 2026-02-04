@@ -63,12 +63,14 @@ def load_config_from_env() -> Dict[str, Any]:
         - CHANNEL_MEMO: Comma-separated memo channel IDs
         - CHANNEL_DIARY: Comma-separated diary channel IDs
         - CHANNEL_READING: Comma-separated reading channel IDs
+        - CHANNEL_TODO: Comma-separated todo channel IDs
         - DISCORD_CHANNELS: (Backward compat) treated as memo channels
 
     Path configuration:
         - GITHUB_PATH_MEMO: Save path for memos (default: Inbox)
         - GITHUB_PATH_DIARY: Save path for diary (default: Diary)
         - GITHUB_PATH_READING: Save path for reading notes (default: Reading)
+        - GITHUB_PATH_TODO: Save path for todo board (default: Todo)
 
     Returns:
         Configuration dictionary
@@ -93,6 +95,11 @@ def load_config_from_env() -> Dict[str, Any]:
     for ch in reading_channels:
         channel_map[ch] = "reading"
 
+    # Todo channels
+    todo_channels = _parse_channels(os.environ.get("CHANNEL_TODO", ""))
+    for ch in todo_channels:
+        channel_map[ch] = "todo"
+
     # Path map: channel_type -> save path
     path_map = {
         "memo": os.environ.get(
@@ -100,6 +107,7 @@ def load_config_from_env() -> Dict[str, Any]:
         ),
         "diary": os.environ.get("GITHUB_PATH_DIARY", "Diary"),
         "reading": os.environ.get("GITHUB_PATH_READING", "Reading"),
+        "todo": os.environ.get("GITHUB_PATH_TODO", "Todo"),
     }
 
     config = {
@@ -251,7 +259,19 @@ class Bot:
             book_title = None
             existing_content = None
 
-            if message.channel_type == "reading":
+            if message.channel_type == "todo":
+                # Todo channel: fixed filename TODO.md
+                filename_hint = "TODO.md"
+                existing_content = self.output.get_existing_content(
+                    filename_hint, base_path=save_path
+                )
+                if existing_content:
+                    logger.info(
+                        f"Found existing Kanban board {save_path}/{filename_hint}, "
+                        "passing to AI for integration"
+                    )
+
+            elif message.channel_type == "reading":
                 # Reading channel: extract book title → use as filename
                 book_title = self.processor.extract_book_title(message.content)
 
@@ -340,7 +360,7 @@ async def main():
         logger.error(
             "Discord channels are required "
             "(set CHANNEL_MEMO, CHANNEL_DIARY, CHANNEL_READING, "
-            "or DISCORD_CHANNELS)"
+            "CHANNEL_TODO, or DISCORD_CHANNELS)"
         )
         sys.exit(1)
 

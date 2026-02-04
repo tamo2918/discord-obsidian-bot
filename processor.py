@@ -192,6 +192,91 @@ class MessageProcessor:
                 return body
         return stripped
 
+    @staticmethod
+    def _new_kanban_board(card: str) -> str:
+        """
+        Create a new Kanban board with a single card in Backlog.
+
+        Args:
+            card: A kanban card line (e.g. "- [ ] task @{2026-02-04}")
+
+        Returns:
+            Complete Kanban board Markdown string
+        """
+        return (
+            "---\n"
+            "kanban-plugin: board\n"
+            "---\n"
+            "\n"
+            "## Backlog\n"
+            "\n"
+            f"{card}\n"
+            "\n"
+            "## Today\n"
+            "\n"
+            "## In Progress\n"
+            "\n"
+            "## Done\n"
+            "**Complete**\n"
+            "\n"
+            "***\n"
+            "\n"
+            "## Archive\n"
+            "\n"
+            "%% kanban:settings\n"
+            "```json\n"
+            '{"kanban-plugin":"board","lane-width":272,"show-checkboxes":true,'
+            '"new-card-insertion-method":"append","show-archive-all":true,'
+            '"date-format":"YYYY-MM-DD","date-trigger":"@",'
+            '"move-dates":true,"move-tags":true}\n'
+            "```\n"
+            "%%\n"
+        )
+
+    @staticmethod
+    def _insert_kanban_card(board_content: str, card: str) -> str:
+        """
+        Insert a new card into the Backlog lane of an existing Kanban board.
+
+        Finds the "## Backlog" heading and appends the card after existing
+        cards in that lane (before the next ## heading).
+
+        Args:
+            board_content: Existing Kanban board Markdown
+            card: A kanban card line to insert
+
+        Returns:
+            Updated board Markdown string
+        """
+        lines = board_content.split("\n")
+        result = []
+        inserted = False
+        in_backlog = False
+
+        for i, line in enumerate(lines):
+            # Detect Backlog lane
+            if line.strip() == "## Backlog":
+                in_backlog = True
+                result.append(line)
+                continue
+
+            # Detect next lane (end of Backlog)
+            if in_backlog and line.strip().startswith("## "):
+                # Insert card before the next lane heading
+                if not inserted:
+                    result.append(card)
+                    result.append("")
+                    inserted = True
+                in_backlog = False
+
+            result.append(line)
+
+        # If Backlog was the last section (shouldn't happen with proper format)
+        if in_backlog and not inserted:
+            result.append(card)
+
+        return "\n".join(result)
+
     def extract_book_title(self, content: str) -> Optional[str]:
         """
         Extract a book title from message content using AI.
@@ -240,6 +325,26 @@ class MessageProcessor:
         logger.debug(f"Processing message with template: {self.template}")
 
         local_time = self._convert_timezone(message.timestamp)
+
+        # Todo channel: fixed filename TODO.md, always overwrite
+        if message.channel_type == "todo":
+            filename = "TODO.md"
+
+            ai_content = self._try_ai_format(message, existing_content)
+            if ai_content:
+                return filename, ai_content, False
+
+            # Fallback: append as plain kanban card to Backlog
+            date_str = local_time.strftime("%Y-%m-%d")
+            new_card = f"- [ ] {message.content} @{{{date_str}}}"
+
+            if existing_content:
+                # Insert new card into Backlog lane of existing board
+                content = self._insert_kanban_card(existing_content, new_card)
+            else:
+                content = self._new_kanban_board(new_card)
+
+            return filename, content, False
 
         # Reading channel: filename = book title, always overwrite
         if message.channel_type == "reading" and book_title:
