@@ -1,11 +1,14 @@
 """Main entry point for Discord-Obsidian Bot."""
 import asyncio
 import collections
+from datetime import datetime, timedelta
 import logging
 import os
 import re
 import sys
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pytz
 
 import yaml
 
@@ -379,14 +382,94 @@ class Bot:
             logger.error(f"Error handling message: {e}")
             return False
 
+    def _get_daily_channel_types(self) -> List[str]:
+        """
+        Return channel types that use date-based daily files.
+
+        Only types that actually have channels configured are returned.
+        """
+        channel_map = self.config.get("discord", {}).get("channel_map", {})
+        active_types = set(channel_map.values())
+        return [t for t in ("memo", "diary") if t in active_types]
+
+    async def _create_daily_templates(self) -> None:
+        """
+        Create today's template files for memo/diary channels.
+
+        Only creates files that don't already exist on GitHub.
+        This ensures frontmatter is always correct and consistent.
+        """
+        tz = self.processor.timezone
+        today = datetime.now(tz).strftime("%Y-%m-%d")
+        filename = f"{today}.md"
+
+        for channel_type in self._get_daily_channel_types():
+            save_path = self.path_map.get(channel_type, "Inbox")
+            existing = self.output.get_existing_content(
+                filename, base_path=save_path
+            )
+            if existing:
+                logger.debug(
+                    f"Daily template already exists: {save_path}/{filename}"
+                )
+                continue
+
+            template = self.processor.generate_daily_template(
+                today, channel_type
+            )
+            success = self.output.save(
+                filename, template, append=False, base_path=save_path
+            )
+            if success:
+                logger.info(
+                    f"Created daily template: {save_path}/{filename}"
+                )
+            else:
+                logger.error(
+                    f"Failed to create daily template: {save_path}/{filename}"
+                )
+
+    async def _daily_template_scheduler(self) -> None:
+        """
+        Background task that creates daily templates at midnight.
+
+        Calculates the time until the next midnight in the configured
+        timezone, sleeps until then, and creates templates.
+        Runs indefinitely.
+        """
+        tz = self.processor.timezone
+        while True:
+            now = datetime.now(tz)
+            tomorrow = (now + timedelta(days=1)).replace(
+                hour=0, minute=0, second=5, microsecond=0
+            )
+            wait_seconds = (tomorrow - now).total_seconds()
+            logger.info(
+                f"Daily template scheduler: next run in "
+                f"{int(wait_seconds)}s (at {tomorrow.strftime('%Y-%m-%d %H:%M:%S')})"
+            )
+            await asyncio.sleep(wait_seconds)
+            await self._create_daily_templates()
+
     async def run(self) -> None:
         """Run the bot."""
         logger.info("Starting Discord-Obsidian Bot...")
+
+        # Create today's templates on startup
+        if self._get_daily_channel_types():
+            await self._create_daily_templates()
+            # Start midnight scheduler in the background
+            self._scheduler_task = asyncio.create_task(
+                self._daily_template_scheduler()
+            )
+
         await self.input.run()
 
     async def stop(self) -> None:
         """Stop the bot."""
         logger.info("Stopping Discord-Obsidian Bot...")
+        if hasattr(self, "_scheduler_task"):
+            self._scheduler_task.cancel()
         await self.input.stop()
 
 

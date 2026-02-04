@@ -41,6 +41,31 @@ class MessageProcessor:
             dt = pytz.utc.localize(dt)
         return dt.astimezone(self.timezone)
 
+    def generate_daily_template(self, date_str: str, channel_type: str) -> str:
+        """
+        Generate a frontmatter template for a daily file (memo or diary).
+
+        This is called at the start of each day (or on bot startup) to
+        pre-create files with correct frontmatter, so AI only needs to
+        handle the body content.
+
+        Args:
+            date_str: Date string in YYYY-MM-DD format
+            channel_type: "memo" or "diary"
+
+        Returns:
+            Markdown string with YAML frontmatter
+        """
+        return (
+            "---\n"
+            f"date: {date_str}\n"
+            "tags: []\n"
+            f"type: {channel_type}\n"
+            "source: discord\n"
+            "status: draft\n"
+            "---\n"
+        )
+
     def _format_attachments(self, attachments: list) -> str:
         """Format attachments as Markdown image links."""
         if not attachments:
