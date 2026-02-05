@@ -82,11 +82,7 @@ class MessageProcessor:
                 "\n"
                 "## 習慣\n"
                 "- [ ] 読書\n"
-                "- [ ] 運動\n"
-                "- [ ] 振り返り\n"
-                "\n"
-                "## リンク\n"
-                "- 関連:\n"
+                "- [ ] 筋トレ\n"
             )
         else:
             # memo (Inbox)
@@ -118,6 +114,7 @@ class MessageProcessor:
             f"created: {date_str}\n"
             f'title: "{book_title}"\n'
             "author: \"\"\n"
+            "aliases: []\n"
             "category: book\n"
             "status: reading\n"
             "rating:\n"
@@ -146,8 +143,14 @@ class MessageProcessor:
             return ""
 
         lines = []
-        for url in attachments:
-            lines.append(f"![]({url})")
+        for path in attachments:
+            if path.startswith("http"):
+                # External URL (fallback)
+                lines.append(f"![]({path})")
+            else:
+                # GitHub-hosted path: use Obsidian embed syntax
+                filename = path.split("/")[-1]
+                lines.append(f"![[{filename}]]")
         return "\n".join(lines)
 
     def _process_daily(self, message: MessageData) -> Tuple[str, str]:

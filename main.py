@@ -309,6 +309,10 @@ class Bot:
             # Determine save path based on channel type
             save_path = self.path_map.get(message.channel_type, "Inbox")
 
+            # Upload Discord attachments to GitHub for permanent storage
+            if message.attachments:
+                message = self._upload_attachments(message, save_path)
+
             book_title = None
             existing_content = None
 
@@ -400,6 +404,34 @@ class Bot:
         except Exception as e:
             logger.error(f"Error handling message: {e}")
             return False
+
+    def _upload_attachments(self, message: MessageData, save_path: str) -> MessageData:
+        """
+        Upload Discord attachments to GitHub and replace URLs.
+
+        Args:
+            message: Original message data with Discord CDN URLs
+            save_path: Base path for the channel type
+
+        Returns:
+            Updated MessageData with GitHub-permanent attachment URLs
+        """
+        local_time = self.processor._convert_timezone(message.timestamp)
+        date_str = local_time.strftime("%Y-%m")
+
+        new_attachments = []
+        for url in message.attachments:
+            github_path = self.output.upload_image(url, date_str, base_path=save_path)
+            if github_path:
+                new_attachments.append(github_path)
+                logger.info(f"Replaced attachment: {url} -> {github_path}")
+            else:
+                # Keep original URL as fallback
+                new_attachments.append(url)
+                logger.warning(f"Failed to upload attachment, keeping original: {url}")
+
+        message.attachments = new_attachments
+        return message
 
     def _get_daily_channel_types(self) -> List[str]:
         """

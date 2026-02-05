@@ -1,10 +1,12 @@
 """GitHub output adapter for saving files to a repository."""
 import base64
+import hashlib
 import logging
 import time
 from typing import Optional, Tuple
 
 import requests
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -185,3 +187,67 @@ class GitHubOutput:
                 return False
 
         return False
+
+    def upload_image(self, image_url: str, date_str: str, base_path: str = None) -> Optional[str]:
+        """
+        Download an image from a URL and upload it to GitHub.
+
+        Args:
+            image_url: URL of the image to download (e.g. Discord CDN)
+            date_str: Date string for organizing (YYYY-MM format)
+            base_path: Override base path for the attachments folder
+
+        Returns:
+            Relative path to the uploaded image for Obsidian, or None if failed
+        """
+        try:
+            # Download image
+            response = requests.get(image_url, timeout=30)
+            if response.status_code != 200:
+                logger.error(f"Failed to download image: {response.status_code}")
+                return None
+
+            image_data = response.content
+
+            # Determine filename from URL or content hash
+            parsed_url = urlparse(image_url)
+            original_name = parsed_url.path.split("/")[-1]
+
+            # Add hash prefix to avoid collisions
+            content_hash = hashlib.md5(image_data).hexdigest()[:8]
+            filename = f"{content_hash}_{original_name}"
+
+            # Upload path: _attachments/YYYY-MM/filename
+            attachments_dir = "_attachments"
+            if base_path:
+                upload_path = f"{base_path}/{attachments_dir}/{date_str}/{filename}"
+            elif self.base_path:
+                upload_path = f"{self.base_path}/{attachments_dir}/{date_str}/{filename}"
+            else:
+                upload_path = f"{attachments_dir}/{date_str}/{filename}"
+
+            # Check if already uploaded
+            _, existing_sha = self._get_file(upload_path)
+            if existing_sha:
+                logger.info(f"Image already exists: {upload_path}")
+                return upload_path
+
+            # Upload to GitHub
+            url = f"{self.API_BASE}/repos/{self.repo}/contents/{upload_path}"
+            body = {
+                "message": f"Upload image: {filename}",
+                "content": base64.b64encode(image_data).decode("utf-8"),
+                "branch": self.branch,
+            }
+
+            resp = requests.put(url, headers=self.headers, json=body)
+            if resp.status_code in (200, 201):
+                logger.info(f"Uploaded image to {upload_path}")
+                return upload_path
+            else:
+                logger.error(f"Failed to upload image: {resp.status_code} - {resp.text}")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error uploading image: {e}")
+            return None
