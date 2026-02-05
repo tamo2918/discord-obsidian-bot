@@ -359,6 +359,15 @@ class Bot:
                         f"Found existing file {save_path}/{filename_hint}, "
                         "passing to AI for integration"
                     )
+                elif self.processor.template == "daily":
+                    # No existing file for daily template: auto-generate template
+                    date_str = local_time.strftime("%Y-%m-%d")
+                    existing_content = self.processor.generate_daily_template(
+                        date_str, message.channel_type
+                    )
+                    logger.info(
+                        f"Auto-generated template for {save_path}/{filename_hint}"
+                    )
 
             # Process message
             filename, content, append = self.processor.process(
