@@ -338,6 +338,16 @@ class Bot:
                             f"Found existing book note {save_path}/{filename_hint}, "
                             "passing to AI for integration"
                         )
+                    else:
+                        # No existing file: auto-generate reading template
+                        local_time = self.processor._convert_timezone(message.timestamp)
+                        date_str = local_time.strftime("%Y-%m-%d")
+                        existing_content = self.processor.generate_reading_template(
+                            date_str, book_title
+                        )
+                        logger.info(
+                            f"Auto-generated reading template for {save_path}/{filename_hint}"
+                        )
                 else:
                     logger.warning(
                         "Could not extract book title, "

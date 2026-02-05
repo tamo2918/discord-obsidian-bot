@@ -101,6 +101,46 @@ class MessageProcessor:
                 "## メモ\n"
             )
 
+    def generate_reading_template(self, date_str: str, book_title: str) -> str:
+        """
+        Generate a template for a reading note file.
+
+        Args:
+            date_str: Date string in YYYY-MM-DD format
+            book_title: Title of the book
+
+        Returns:
+            Markdown string with YAML frontmatter and section structure
+        """
+        return (
+            "---\n"
+            "type: reading\n"
+            f"created: {date_str}\n"
+            f'title: "{book_title}"\n'
+            "author: \"\"\n"
+            "category: book\n"
+            "status: reading\n"
+            "rating:\n"
+            "tags:\n"
+            "  - 読書\n"
+            "---\n"
+            "\n"
+            "## 読んだ理由\n"
+            "-\n"
+            "\n"
+            "## 重要なアイデア\n"
+            "-\n"
+            "\n"
+            "## 印象に残った言葉\n"
+            ">\n"
+            "\n"
+            "## 実践すること\n"
+            "-\n"
+            "\n"
+            "## 関連\n"
+            "-\n"
+        )
+
     def _format_attachments(self, attachments: list) -> str:
         """Format attachments as Markdown image links."""
         if not attachments:
