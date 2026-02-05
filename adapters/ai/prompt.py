@@ -20,25 +20,19 @@ MEMO_SYSTEM_PROMPT = """\
 
 ```yaml
 ---
-date: 2026-01-15 14:30
+type: memo
+created: 2026-01-15
+processed: false
 tags:
   - 食事
   - 渋谷
-type: memo
-source: discord
-author: ユーザー名
-status: draft
-aliases:
-  - 略称や別名（あれば）
 ---
 ```
 
-- **tags**: 内容に合ったタグ（3〜5個）。階層タグも活用する（例: `プログラミング/Python`、`場所/渋谷`）
 - **type**: `memo` 固定
-- **source**: `discord` 固定
-- **author**: メタデータから取得
-- **status**: `draft` 固定（ユーザーが後でレビュー）
-- **aliases**: 内容の略称や英語/日本語の別表記があれば追加（なければ省略可）
+- **created**: 日付（YYYY-MM-DD形式）
+- **processed**: `false` 固定（ユーザーが整理済みなら `true` に変更）
+- **tags**: 内容に合ったタグ（3〜5個）。階層タグも活用する（例: `プログラミング/Python`、`場所/渋谷`）
 
 ## 内部リンク `[[]]`（最重要）
 
@@ -81,15 +75,15 @@ Obsidianの最大の強みは知識同士をリンクで繋げることです。
 
 ```markdown
 ---
-date: 2026-01-15 14:30
+type: memo
+created: 2026-01-15
+processed: false
 tags:
   - 食事
   - 場所/渋谷
-type: memo
-source: discord
-author: tamo
-status: draft
 ---
+
+## Memo
 
 [[渋谷]]で美味しいラーメンを食べた。[[味噌ラーメン]]ベースのスープが濃厚で、チャーシューも柔らかかった。
 
@@ -118,23 +112,22 @@ DIARY_SYSTEM_PROMPT = """\
 
 ```yaml
 ---
-date: 2026-01-15
+type: diary
+created: 2026-01-15
 tags:
   - 食事
   - 場所/渋谷
   - 外出
-type: diary
-source: discord
-author: ユーザー名
-status: draft
+mood: 5
+energy: 5
 ---
 ```
 
-- **tags**: その日の出来事に関連するタグ（3〜5個）。階層タグも活用（例: `場所/渋谷`、`趣味/料理`）
 - **type**: `diary` 固定
-- **source**: `discord` 固定
-- **author**: メタデータから取得
-- **status**: `draft` 固定
+- **created**: 日付（YYYY-MM-DD形式）
+- **tags**: その日の出来事に関連するタグ（3〜5個）。階層タグも活用（例: `場所/渋谷`、`趣味/料理`）
+- **mood**: 気分スコア（1-5）。メッセージ内容から推測、分からなければ5
+- **energy**: 活力スコア（1-5）。メッセージ内容から推測、分からなければ5
 
 ## 内部リンク `[[]]`（最重要）
 
@@ -175,26 +168,39 @@ status: draft
 
 ```markdown
 ---
-date: 2026-01-15
+type: diary
+created: 2026-01-15
 tags:
   - 食事
   - 場所/渋谷
   - 外出
-type: diary
-source: discord
-author: tamo
-status: draft
+mood: 4
+energy: 4
 ---
 
-## 今日のできごと
+## Today's Log
 
-[[渋谷]]に出かけて、前から気になっていた[[麺屋武蔵]]に行った。
-味噌ベースのスープが濃厚で、チャーシューも柔らかくてとても美味しかった。
+### Done
+- [[渋谷]]に出かけて[[麺屋武蔵]]でラーメンを食べた
+- [[スタバ 渋谷店]]で[[読書]]
 
-帰りに[[スタバ 渋谷店]]で[[読書]]。[[Clean Code]]の続きを読んだ。
+### Happened
+- 味噌ベースのスープが濃厚で美味しかった
+- [[Clean Code]]の続きを読んだ
 
-> [!tip] 振り返り
-> 最近外食が多い。来週は自炊を増やしたい。
+### Thoughts
+- 最近外食が多い。来週は自炊を増やしたい
+
+### Tomorrow
+- 自炊する
+
+## Habits
+- [ ] 読書
+- [ ] 運動
+- [ ] 振り返り
+
+## Links
+- Related: [[渋谷]], [[麺屋武蔵]]
 ```\
 """
 
@@ -216,29 +222,27 @@ READING_SYSTEM_PROMPT = """\
 
 ```yaml
 ---
+type: reading
+created: 2026-01-15
 title: "書籍タイトル"
-book_author: "[[著者名]]"
+author: "[[著者名]]"
+category: book
+status: reading
+rating:
 tags:
   - 読書
   - ジャンル/技術書
-type: book
-source: discord
-author: ユーザー名
-status: reading
-genre: 技術書
-rating:
 ---
 ```
 
+- **type**: `reading` 固定
+- **created**: 日付（YYYY-MM-DD形式）
 - **title**: 書籍の正式タイトル
-- **book_author**: 著者名を `[[]]` リンク付きで
-- **tags**: `読書` は必須。ジャンルを階層タグで（例: `ジャンル/技術書`、`ジャンル/小説`）。内容に関連するタグも追加（3〜5個）
-- **type**: `book` 固定
-- **source**: `discord` 固定
-- **author**: メタデータの投稿者
+- **author**: 著者名を `[[]]` リンク付きで
+- **category**: `book` | `article` | `paper` | `video`
 - **status**: `reading`（読書中）。ユーザーが後で `finished` に変更する
-- **genre**: ジャンル（技術書、ビジネス書、小説、自己啓発、etc.）
 - **rating**: 空欄（ユーザーが後で記入）
+- **tags**: `読書` は必須。ジャンルを階層タグで（例: `ジャンル/技術書`、`ジャンル/小説`）。内容に関連するタグも追加（3〜5個）
 
 ## 内部リンク `[[]]`（最重要）
 
@@ -294,23 +298,26 @@ rating:
 
 ```markdown
 ---
+type: reading
+created: 2026-01-15
 title: "Clean Code"
-book_author: "[[Robert C. Martin]]"
+author: "[[Robert C. Martin]]"
+category: book
+status: reading
+rating:
 tags:
   - 読書
   - ジャンル/技術書
   - プログラミング/設計
-type: book
-source: discord
-author: tamo
-status: reading
-genre: 技術書
-rating:
 ---
 
-# [[Clean Code]]
+## Why I Read This
+- コードの品質を上げたい
+- チームで読みやすいコードを書きたい
 
-## 第3章 - 関数
+## Key Ideas
+
+### 第3章 - 関数
 
 [[関数]]は短く書くべきという主張。1つの関数は1つのことだけをする。
 これは[[単一責任の原則]]に通じる考え方。
@@ -318,16 +325,21 @@ rating:
 > [!quote] 印象に残った一節
 > 関数の最初のルールは、小さいことだ。第二のルールは、もっと小さくすることだ。
 
-> [!tip] 学び
-> 自分のコードを振り返ると、1つの関数に複数の責務を持たせがち。明日から意識する。
-
-## 第5章 - 命名規則
+### 第5章 - 命名規則
 
 意図が伝わる名前をつけることの重要性。[[変数名]]は検索可能であるべき。
 [[リーダブルコード]]にも同様の主張があった。
 
-> [!example] 実践ポイント
-> `d` ではなく `elapsedTimeInDays` のように、意図を込めた名前にする。
+## Quotes
+> 関数の最初のルールは、小さいことだ。
+
+## How to Apply
+- `d` ではなく `elapsedTimeInDays` のように、意図を込めた名前にする
+- 1つの関数に複数の責務を持たせない
+
+## Related
+- [[リーダブルコード]]
+- [[単一責任の原則]]
 ```\
 """
 
