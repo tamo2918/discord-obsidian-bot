@@ -190,6 +190,7 @@ class MessageProcessor:
         self,
         message: MessageData,
         existing_content: str = None,
+        content_override: str = None,
     ) -> Optional[str]:
         """
         Try to format message content using AI.
@@ -197,6 +198,7 @@ class MessageProcessor:
         Args:
             message: Message data to format
             existing_content: Existing Obsidian file content to integrate with
+            content_override: If provided, use this instead of message.content
 
         Returns:
             AI-formatted content, or None if AI is unavailable or failed
@@ -218,7 +220,8 @@ class MessageProcessor:
             "channel_type": message.channel_type,
         }
 
-        result = self.ai.format_message(message.content, metadata, existing_content)
+        content = content_override if content_override else message.content
+        result = self.ai.format_message(content, metadata, existing_content)
 
         if result:
             if existing_content:
@@ -361,20 +364,60 @@ class MessageProcessor:
 
         return "\n".join(result)
 
-    def extract_book_title(self, content: str) -> Optional[str]:
+    @staticmethod
+    def extract_book_title_from_format(content: str) -> Optional[Tuple[str, str]]:
         """
-        Extract a book title from message content using AI.
+        Extract book title from 【タイトル】 or [タイトル] format at the start.
 
         Args:
             content: Raw message content
 
         Returns:
-            Book title string, or None if AI unavailable or extraction failed
+            Tuple of (title, remaining_content) if found, None otherwise
         """
+        # Match 【タイトル】 or [タイトル] at the start of the message
+        match = re.match(r"^[【\[](.+?)[】\]]\s*", content)
+        if match:
+            title = match.group(1).strip()
+            remaining = content[match.end():].strip()
+            return title, remaining
+        return None
+
+    def extract_book_title(self, content: str) -> Optional[str]:
+        """
+        Extract a book title from message content.
+
+        First tries to extract from 【タイトル】 or [タイトル] format.
+        Falls back to AI extraction if format not found.
+
+        Args:
+            content: Raw message content
+
+        Returns:
+            Book title string, or None if extraction failed
+        """
+        # First try format-based extraction
+        result = self.extract_book_title_from_format(content)
+        if result:
+            title, _ = result
+            logger.info(f"Extracted book title from format: {title}")
+            return title
+
+        # Fall back to AI extraction
         if not self.ai:
+            logger.warning(
+                "No book title format found and AI unavailable. "
+                "Use 【タイトル】 format to specify the book."
+            )
             return None
         if not self.ai.is_available():
+            logger.warning(
+                "No book title format found and AI unavailable. "
+                "Use 【タイトル】 format to specify the book."
+            )
             return None
+
+        logger.info("No book title format found, falling back to AI extraction")
         return self.ai.extract_book_title(content)
 
     def process(
@@ -434,7 +477,15 @@ class MessageProcessor:
         if message.channel_type == "reading" and book_title:
             filename = f"{book_title}.md"
 
-            ai_content = self._try_ai_format(message, existing_content)
+            # Strip title from content if it was specified in 【タイトル】 format
+            cleaned_content = message.content
+            format_result = self.extract_book_title_from_format(message.content)
+            if format_result:
+                _, cleaned_content = format_result
+
+            ai_content = self._try_ai_format(
+                message, existing_content, content_override=cleaned_content
+            )
             if ai_content:
                 return filename, ai_content, False
 
