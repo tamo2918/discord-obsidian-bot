@@ -54,17 +54,52 @@ class MessageProcessor:
             channel_type: "memo" or "diary"
 
         Returns:
-            Markdown string with YAML frontmatter
+            Markdown string with YAML frontmatter and section structure
         """
-        return (
-            "---\n"
-            f"date: {date_str}\n"
-            "tags: []\n"
-            f"type: {channel_type}\n"
-            "source: discord\n"
-            "status: draft\n"
-            "---\n"
-        )
+        if channel_type == "diary":
+            return (
+                "---\n"
+                "type: diary\n"
+                f"created: {date_str}\n"
+                "tags: []\n"
+                "mood: 5\n"
+                "energy: 5\n"
+                "---\n"
+                "\n"
+                "## Today's Log\n"
+                "\n"
+                "### Done\n"
+                "-\n"
+                "\n"
+                "### Happened\n"
+                "-\n"
+                "\n"
+                "### Thoughts\n"
+                "-\n"
+                "\n"
+                "### Tomorrow\n"
+                "-\n"
+                "\n"
+                "## Habits\n"
+                "- [ ] 読書\n"
+                "- [ ] 運動\n"
+                "- [ ] 振り返り\n"
+                "\n"
+                "## Links\n"
+                "- Related:\n"
+            )
+        else:
+            # memo (Inbox)
+            return (
+                "---\n"
+                "type: memo\n"
+                f"created: {date_str}\n"
+                "processed: false\n"
+                "tags: []\n"
+                "---\n"
+                "\n"
+                "## Memo\n"
+            )
 
     def _format_attachments(self, attachments: list) -> str:
         """Format attachments as Markdown image links."""

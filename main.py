@@ -107,11 +107,11 @@ def load_config_from_env() -> Dict[str, Any]:
     # Path map: channel_type -> save path
     path_map = {
         "memo": os.environ.get(
-            "GITHUB_PATH_MEMO", os.environ.get("GITHUB_PATH", "Inbox")
+            "GITHUB_PATH_MEMO", os.environ.get("GITHUB_PATH", "00_Inbox")
         ),
-        "diary": os.environ.get("GITHUB_PATH_DIARY", "Diary"),
-        "reading": os.environ.get("GITHUB_PATH_READING", "Reading"),
-        "todo": os.environ.get("GITHUB_PATH_TODO", "Todo"),
+        "diary": os.environ.get("GITHUB_PATH_DIARY", "10_Diary"),
+        "reading": os.environ.get("GITHUB_PATH_READING", "60_Reading"),
+        "todo": os.environ.get("GITHUB_PATH_TODO", "20_Todo"),
     }
 
     config = {
@@ -123,7 +123,7 @@ def load_config_from_env() -> Dict[str, Any]:
             "token": os.environ.get("GITHUB_TOKEN", ""),
             "repo": os.environ.get("GITHUB_REPO", ""),
             "branch": os.environ.get("GITHUB_BRANCH", "main"),
-            "path": os.environ.get("GITHUB_PATH", "Inbox"),
+            "path": os.environ.get("GITHUB_PATH", "00_Inbox"),
         },
         "path_map": path_map,
         "processor": {
@@ -221,8 +221,8 @@ class Bot:
         """
         self.config = config
 
-        # Path map: channel_type -> save path (e.g. {"memo": "Inbox", "diary": "Diary"})
-        self.path_map = config.get("path_map", {"memo": "Inbox"})
+        # Path map: channel_type -> save path (e.g. {"memo": "00_Inbox", "diary": "10_Diary"})
+        self.path_map = config.get("path_map", {"memo": "00_Inbox"})
 
         # Initialize AI adapter (optional)
         ai_adapter = create_ai_adapter(config.get("ai", {}))

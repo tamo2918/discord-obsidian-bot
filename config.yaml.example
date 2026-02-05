@@ -1,15 +1,26 @@
 # Discord設定
 discord:
   token: "${DISCORD_TOKEN}"          # 環境変数から取得
-  channels:
-    - "1468055959707320586"          # 監視対象チャンネルID（複数指定可）
+  # チャンネルタイプごとに設定（channel_id: type）
+  channel_map:
+    "1234567890123456789": "memo"     # メモ用チャンネル → 00_Inbox
+    "1234567890123456790": "diary"    # 日記用チャンネル → 10_Diary
+    "1234567890123456791": "reading"  # 読書メモ用チャンネル → 60_Reading
+    "1234567890123456792": "todo"     # TODO用チャンネル → 20_Todo
 
 # GitHub設定
 github:
   token: "${GITHUB_TOKEN}"           # 環境変数から取得
   repo: "tamo2918/ObsidianVault"     # リポジトリ名（owner/repo形式）
   branch: "main"                      # ブランチ名
-  path: "Inbox"                       # 保存先フォルダ
+  path: "00_Inbox"                    # デフォルト保存先フォルダ
+
+# パスマッピング（チャンネルタイプ → 保存先フォルダ）
+path_map:
+  memo: "00_Inbox"                    # メモ → Inbox
+  diary: "10_Diary"                   # 日記 → Diary
+  reading: "60_Reading"              # 読書メモ → Reading
+  todo: "20_Todo"                     # TODO → Todo
 
 # メッセージ処理設定
 processor:
