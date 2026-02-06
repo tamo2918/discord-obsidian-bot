@@ -29,3 +29,11 @@ processor:
 
   # daily: 日付ごとに1ファイル（追記モード）
   # single: 1メッセージ1ファイル
+
+# AI整形設定（オプション）
+ai:
+  enabled: true
+  provider: "gemini"                  # ollama | openai | gemini
+  model: "gemini-2.5-flash"          # Geminiモデル名
+  api_key: "${AI_API_KEY}"           # Gemini APIキー
+  timeout: 60                         # タイムアウト秒数

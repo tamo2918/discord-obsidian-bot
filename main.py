@@ -202,6 +202,12 @@ def create_ai_adapter(config: Dict[str, Any]) -> Optional[BaseAIAdapter]:
             f"AI adapter: OpenAI-compatible (url={config.get('base_url')}, "
             f"model={config.get('model')})"
         )
+    elif provider == "gemini":
+        from adapters.ai.gemini_ai import GeminiAI
+        adapter = GeminiAI(config)
+        logger.info(
+            f"AI adapter: Gemini (model={config.get('model')})"
+        )
     else:
         logger.warning(f"Unknown AI provider '{provider}', AI disabled")
         return None
