@@ -2,3 +2,6 @@ discord.py>=2.0
 PyYAML>=6.0
 pytz>=2023.3
 requests>=2.31.0
+feedparser>=6.0
+beautifulsoup4>=4.12
+html2text>=2024.2

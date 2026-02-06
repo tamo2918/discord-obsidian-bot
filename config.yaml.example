@@ -30,6 +30,12 @@ processor:
   # daily: 日付ごとに1ファイル（追記モード）
   # single: 1メッセージ1ファイル
 
+# note.com RSS取得設定（オプション）
+note_rss:
+  users: "username1,username2"           # カンマ区切りのnoteユーザー名
+  path: "70_Note"                        # 保存先フォルダパス
+  interval: 60                           # チェック間隔（分）
+
 # AI整形設定（オプション）
 ai:
   enabled: true

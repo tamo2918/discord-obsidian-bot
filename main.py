@@ -14,6 +14,7 @@ import yaml
 
 from adapters.base import BaseAIAdapter, MessageData
 from adapters.inputs.discord_input import DiscordInput
+from adapters.inputs.note_rss import NoteRSSFetcher
 from adapters.outputs.github_output import GitHubOutput
 from processor import MessageProcessor
 
@@ -138,6 +139,11 @@ def load_config_from_env() -> Dict[str, Any]:
             "api_key": os.environ.get("AI_API_KEY", ""),
             "timeout": os.environ.get("AI_TIMEOUT", "60"),
         },
+        "note_rss": {
+            "users": os.environ.get("NOTE_RSS_USERS", ""),
+            "path": os.environ.get("NOTE_RSS_PATH", "70_Note"),
+            "interval": os.environ.get("NOTE_RSS_INTERVAL", "60"),
+        },
     }
 
     return config
@@ -243,6 +249,13 @@ class Bot:
         self._file_locks: Dict[str, asyncio.Lock] = collections.defaultdict(
             asyncio.Lock
         )
+
+        # Initialize note.com RSS fetcher (optional)
+        note_rss_config = config.get("note_rss", {})
+        note_rss_config["timezone"] = config.get("processor", {}).get(
+            "timezone", "Asia/Tokyo"
+        )
+        self.note_rss = NoteRSSFetcher(note_rss_config, self.output)
 
         # Initialize input adapter
         self.input = DiscordInput(
@@ -508,6 +521,24 @@ class Bot:
             await asyncio.sleep(wait_seconds)
             await self._create_daily_templates()
 
+    async def _fetch_note_articles(self) -> None:
+        """Fetch and save new articles for all configured note.com users."""
+        for username in self.note_rss.users:
+            try:
+                count = self.note_rss.save_new_articles(username)
+                if count > 0:
+                    logger.info(f"note.com RSS: saved {count} new articles for {username}")
+                else:
+                    logger.info(f"note.com RSS: no new articles for {username}")
+            except Exception as e:
+                logger.error(f"note.com RSS: error fetching articles for {username}: {e}")
+
+    async def _note_rss_scheduler(self) -> None:
+        """Background task that periodically checks note.com RSS feeds."""
+        while True:
+            await self._fetch_note_articles()
+            await asyncio.sleep(self.note_rss.interval * 60)
+
     async def run(self) -> None:
         """Run the bot."""
         logger.info("Starting Discord-Obsidian Bot...")
@@ -520,6 +551,17 @@ class Bot:
                 self._daily_template_scheduler()
             )
 
+        # Start note.com RSS scheduler if users are configured
+        if self.note_rss.users:
+            logger.info(
+                f"Starting note.com RSS scheduler for users: "
+                f"{', '.join(self.note_rss.users)} "
+                f"(interval: {self.note_rss.interval}min)"
+            )
+            self._note_rss_task = asyncio.create_task(
+                self._note_rss_scheduler()
+            )
+
         await self.input.run()
 
     async def stop(self) -> None:
@@ -527,6 +569,8 @@ class Bot:
         logger.info("Stopping Discord-Obsidian Bot...")
         if hasattr(self, "_scheduler_task"):
             self._scheduler_task.cancel()
+        if hasattr(self, "_note_rss_task"):
+            self._note_rss_task.cancel()
         await self.input.stop()
 
 
