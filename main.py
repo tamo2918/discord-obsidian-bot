@@ -17,6 +17,7 @@ from adapters.inputs.discord_input import DiscordInput
 from adapters.inputs.note_rss import NoteRSSFetcher
 from adapters.outputs.github_output import GitHubOutput
 from processor import MessageProcessor
+from youtube_utils import extract_video_id, fetch_transcript, get_video_title, sanitize_title
 
 # Configure logging
 logging.basicConfig(
@@ -110,6 +111,11 @@ def load_config_from_env() -> Dict[str, Any]:
     for ch in glossary_channels:
         channel_map[ch] = "glossary"
 
+    # YouTube channels
+    youtube_channels = _parse_channels(os.environ.get("CHANNEL_YOUTUBE", ""))
+    for ch in youtube_channels:
+        channel_map[ch] = "youtube"
+
     # Path map: channel_type -> save path
     path_map = {
         "memo": os.environ.get(
@@ -119,6 +125,7 @@ def load_config_from_env() -> Dict[str, Any]:
         "reading": os.environ.get("GITHUB_PATH_READING", "60_Reading"),
         "todo": os.environ.get("GITHUB_PATH_TODO", "20_Todo"),
         "glossary": os.environ.get("GITHUB_PATH_GLOSSARY", "50_Glossary"),
+        "youtube": os.environ.get("GITHUB_PATH_YOUTUBE", "70_YouTube"),
     }
 
     config = {
@@ -291,6 +298,10 @@ class Bot:
             term = message.content.strip()
             return f"{save_path}/{term}.md"
 
+        if message.channel_type == "youtube":
+            video_id = extract_video_id(message.content.strip())
+            return f"{save_path}/{video_id or 'unknown'}"
+
         if message.channel_type == "reading":
             book_title = self.processor.extract_book_title(message.content)
             if book_title:
@@ -343,6 +354,8 @@ class Bot:
                 message = self._upload_attachments(message, save_path)
 
             book_title = None
+            video_title = None
+            video_transcript = None
             existing_content = None
 
             if message.channel_type == "todo":
@@ -410,6 +423,50 @@ class Bot:
                         f"Auto-generated glossary template for {save_path}/{filename_hint}"
                     )
 
+            elif message.channel_type == "youtube":
+                # YouTube channel: extract video info and transcript
+                url = message.content.strip()
+                vid = extract_video_id(url)
+                if vid:
+                    video_title = get_video_title(vid) or f"YouTube_{vid}"
+                    video_transcript = fetch_transcript(vid)
+                    if video_transcript:
+                        logger.info(
+                            f"Fetched transcript for {vid} "
+                            f"({len(video_transcript)} chars)"
+                        )
+                    else:
+                        logger.warning(
+                            f"No transcript available for {vid}, "
+                            "creating note without transcript"
+                        )
+                        video_transcript = "（文字起こしを取得できませんでした）"
+
+                    safe_title = sanitize_title(video_title)
+                    filename_hint = f"{safe_title}.md"
+                    existing_content = self.output.get_existing_content(
+                        filename_hint, base_path=save_path
+                    )
+                    if existing_content:
+                        logger.info(
+                            f"Found existing YouTube note {save_path}/{filename_hint}, "
+                            "passing to AI for integration"
+                        )
+                    else:
+                        local_time = self.processor._convert_timezone(message.timestamp)
+                        date_str = local_time.strftime("%Y-%m-%d")
+                        existing_content = self.processor.generate_youtube_template(
+                            date_str, video_title, url
+                        )
+                        logger.info(
+                            f"Auto-generated YouTube template for {save_path}/{filename_hint}"
+                        )
+                else:
+                    logger.warning(
+                        f"Could not extract video ID from URL: {url}, "
+                        "falling back to date-based filename"
+                    )
+
             else:
                 # Memo/Diary: date-based filename
                 local_time = self.processor._convert_timezone(message.timestamp)
@@ -441,6 +498,8 @@ class Bot:
                 message,
                 existing_content=existing_content,
                 book_title=book_title,
+                video_title=video_title,
+                video_transcript=video_transcript,
             )
 
             logger.info(

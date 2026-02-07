@@ -7,6 +7,7 @@ from typing import List, Optional, Tuple
 import pytz
 
 from adapters.base import BaseAIAdapter, MessageData
+from youtube_utils import sanitize_title
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +174,47 @@ class MessageProcessor:
             "-\n"
             "\n"
             "## 参考リンク\n"
+            "-\n"
+        )
+
+    def generate_youtube_template(self, date_str: str, title: str, url: str) -> str:
+        """
+        Generate a template for a YouTube knowledge note.
+
+        Args:
+            date_str: Date string in YYYY-MM-DD format
+            title: Video title
+            url: YouTube video URL
+
+        Returns:
+            Markdown string with YAML frontmatter and section structure
+        """
+        return (
+            "---\n"
+            "type: youtube\n"
+            f"created: {date_str}\n"
+            f'title: "{title}"\n'
+            f'url: "{url}"\n'
+            "tags:\n"
+            "  - YouTube\n"
+            "aliases: []\n"
+            "---\n"
+            "\n"
+            f"# {title}\n"
+            "\n"
+            "## 概要\n"
+            "-\n"
+            "\n"
+            "## キーポイント\n"
+            "-\n"
+            "\n"
+            "## 詳細ノート\n"
+            "-\n"
+            "\n"
+            "## 引用・重要な発言\n"
+            ">\n"
+            "\n"
+            "## 関連リンク\n"
             "-\n"
         )
 
@@ -506,6 +548,8 @@ class MessageProcessor:
         message: MessageData,
         existing_content: str = None,
         book_title: str = None,
+        video_title: str = None,
+        video_transcript: str = None,
     ) -> Tuple[str, str, bool]:
         """
         Process a message and return filename and content.
@@ -518,6 +562,9 @@ class MessageProcessor:
         For reading channel type, book_title determines the filename
         (e.g. "Clean Code.md") and content is always overwritten.
 
+        For youtube channel type, video_title determines the filename
+        and video_transcript is passed to AI for structuring.
+
         For daily (append) mode without existing content, frontmatter is
         stripped from AI output to prevent duplicates.
 
@@ -525,6 +572,8 @@ class MessageProcessor:
             message: Message data to process
             existing_content: Existing Obsidian file content for AI integration
             book_title: Book title for reading channel (determines filename)
+            video_title: Video title for YouTube channel (determines filename)
+            video_transcript: Transcript text for YouTube channel
 
         Returns:
             Tuple of (filename, content, should_append)
@@ -589,6 +638,23 @@ class MessageProcessor:
             local_time = self._convert_timezone(message.timestamp)
             date_str = local_time.strftime("%Y-%m-%d")
             return filename, self.generate_glossary_template(date_str, term), False
+
+        # YouTube channel: filename = sanitized video title, always overwrite
+        if message.channel_type == "youtube" and video_title:
+            filename = f"{sanitize_title(video_title)}.md"
+
+            ai_content = self._try_ai_format(
+                message, existing_content, content_override=video_transcript
+            )
+            if ai_content:
+                return filename, ai_content, False
+
+            # Fallback: use template as-is
+            if existing_content:
+                return filename, existing_content, False
+            date_str = local_time.strftime("%Y-%m-%d")
+            url = message.content.strip()
+            return filename, self.generate_youtube_template(date_str, video_title, url), False
 
         # Determine filename based on template
         if self.template == "single":
