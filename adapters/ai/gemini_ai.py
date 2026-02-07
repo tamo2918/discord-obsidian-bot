@@ -26,7 +26,7 @@ class GeminiAI(BaseAIAdapter):
             "x-goog-api-key": self.api_key,
         }
 
-    def _generate(self, system_prompt: str, user_prompt: str, temperature: float) -> Optional[str]:
+    def _generate(self, system_prompt: str, user_prompt: str, temperature: float, tools=None) -> Optional[str]:
         """
         Call the Gemini generateContent endpoint.
 
@@ -34,6 +34,7 @@ class GeminiAI(BaseAIAdapter):
             system_prompt: System instruction text
             user_prompt: User message text
             temperature: Sampling temperature
+            tools: Optional list of tools (e.g. [{"google_search": {}}])
 
         Returns:
             Generated text, or None on failure
@@ -54,6 +55,9 @@ class GeminiAI(BaseAIAdapter):
                 "temperature": temperature,
             },
         }
+
+        if tools:
+            payload["tools"] = tools
 
         resp = requests.post(
             url,
@@ -112,7 +116,11 @@ class GeminiAI(BaseAIAdapter):
             system_prompt = get_system_prompt(channel_type)
             user_prompt = build_user_prompt(content, metadata, existing_content)
 
-            result = self._generate(system_prompt, user_prompt, temperature=0.3)
+            tools = None
+            if channel_type == "glossary":
+                tools = [{"google_search": {}}]
+
+            result = self._generate(system_prompt, user_prompt, temperature=0.3, tools=tools)
 
             if result:
                 logger.info(f"AI formatting successful (model={self.model})")

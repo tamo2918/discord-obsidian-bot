@@ -105,6 +105,11 @@ def load_config_from_env() -> Dict[str, Any]:
     for ch in todo_channels:
         channel_map[ch] = "todo"
 
+    # Glossary channels
+    glossary_channels = _parse_channels(os.environ.get("CHANNEL_GLOSSARY", ""))
+    for ch in glossary_channels:
+        channel_map[ch] = "glossary"
+
     # Path map: channel_type -> save path
     path_map = {
         "memo": os.environ.get(
@@ -113,6 +118,7 @@ def load_config_from_env() -> Dict[str, Any]:
         "diary": os.environ.get("GITHUB_PATH_DIARY", "10_Diary"),
         "reading": os.environ.get("GITHUB_PATH_READING", "60_Reading"),
         "todo": os.environ.get("GITHUB_PATH_TODO", "20_Todo"),
+        "glossary": os.environ.get("GITHUB_PATH_GLOSSARY", "50_Glossary"),
     }
 
     config = {
@@ -281,6 +287,10 @@ class Bot:
         if message.channel_type == "todo":
             return f"{save_path}/TODO.md"
 
+        if message.channel_type == "glossary":
+            term = message.content.strip()
+            return f"{save_path}/{term}.md"
+
         if message.channel_type == "reading":
             book_title = self.processor.extract_book_title(message.content)
             if book_title:
@@ -376,6 +386,30 @@ class Bot:
                         "Could not extract book title, "
                         "falling back to date-based filename"
                     )
+
+            elif message.channel_type == "glossary":
+                # Glossary channel: filename = term.md
+                term = message.content.strip()
+                filename_hint = f"{term}.md"
+                existing_content = self.output.get_existing_content(
+                    filename_hint, base_path=save_path
+                )
+                if existing_content:
+                    logger.info(
+                        f"Found existing glossary note {save_path}/{filename_hint}, "
+                        "passing to AI for integration"
+                    )
+                else:
+                    # No existing file: auto-generate glossary template
+                    local_time = self.processor._convert_timezone(message.timestamp)
+                    date_str = local_time.strftime("%Y-%m-%d")
+                    existing_content = self.processor.generate_glossary_template(
+                        date_str, term
+                    )
+                    logger.info(
+                        f"Auto-generated glossary template for {save_path}/{filename_hint}"
+                    )
+
             else:
                 # Memo/Diary: date-based filename
                 local_time = self.processor._convert_timezone(message.timestamp)

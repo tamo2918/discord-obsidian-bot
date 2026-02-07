@@ -137,6 +137,45 @@ class MessageProcessor:
             "-\n"
         )
 
+    def generate_glossary_template(self, date_str: str, term: str) -> str:
+        """
+        Generate a template for a glossary note file.
+
+        Args:
+            date_str: Date string in YYYY-MM-DD format
+            term: The term to define
+
+        Returns:
+            Markdown string with YAML frontmatter and section structure
+        """
+        return (
+            "---\n"
+            "type: glossary\n"
+            f'term: "{term}"\n'
+            f"created: {date_str}\n"
+            "tags:\n"
+            "  - 用語集\n"
+            "aliases: []\n"
+            "---\n"
+            "\n"
+            f"# {term}\n"
+            "\n"
+            "## 概要\n"
+            "-\n"
+            "\n"
+            "## 詳細説明\n"
+            "-\n"
+            "\n"
+            "## 使用例\n"
+            "-\n"
+            "\n"
+            "## 関連用語\n"
+            "-\n"
+            "\n"
+            "## 参考リンク\n"
+            "-\n"
+        )
+
     def _format_attachments(self, attachments: list) -> str:
         """Format attachments as Markdown image links."""
         if not attachments:
@@ -534,6 +573,22 @@ class MessageProcessor:
             # Fallback: plain markdown with book title
             _, content = self._process_single(message)
             return filename, content, False
+
+        # Glossary channel: filename = term.md, always overwrite
+        if message.channel_type == "glossary":
+            term = message.content.strip()
+            filename = f"{term}.md"
+
+            ai_content = self._try_ai_format(message, existing_content)
+            if ai_content:
+                return filename, ai_content, False
+
+            # Fallback: use template as-is
+            if existing_content:
+                return filename, existing_content, False
+            local_time = self._convert_timezone(message.timestamp)
+            date_str = local_time.strftime("%Y-%m-%d")
+            return filename, self.generate_glossary_template(date_str, term), False
 
         # Determine filename based on template
         if self.template == "single":
