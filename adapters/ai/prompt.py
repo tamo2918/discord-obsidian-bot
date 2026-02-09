@@ -716,10 +716,10 @@ def build_user_prompt(
     if metadata.get("timestamp"):
         parts.append(f"日時: {metadata['timestamp']}")
 
-    if metadata.get("author"):
+    if metadata.get("author") and channel_type != "memo":
         parts.append(f"投稿者: {metadata['author']}")
 
-    if metadata.get("channel"):
+    if metadata.get("channel") and channel_type != "memo":
         parts.append(f"チャンネル: {metadata['channel']}")
 
     if metadata.get("attachments"):

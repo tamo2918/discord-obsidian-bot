@@ -251,12 +251,17 @@ class MessageProcessor:
         # Filename: YYYY-MM-DD.md
         filename = local_time.strftime("%Y-%m-%d.md")
 
-        # Content format
-        lines = [
-            f"## {local_time.strftime('%H:%M')}",
-            "",
-            message.content,
-        ]
+        # Content format (memo: no time heading, diary: keep time heading)
+        if message.channel_type == "memo":
+            lines = [
+                message.content,
+            ]
+        else:
+            lines = [
+                f"## {local_time.strftime('%H:%M')}",
+                "",
+                message.content,
+            ]
 
         # Add attachments
         attachments_md = self._format_attachments(message.attachments)
@@ -285,16 +290,19 @@ class MessageProcessor:
         # Filename: YYYY-MM-DD_HHMMSS.md
         filename = local_time.strftime("%Y-%m-%d_%H%M%S.md")
 
-        # Content format with frontmatter
+        # Content format with frontmatter (memo: no author/channel)
         lines = [
             "---",
             f"date: {local_time.strftime('%Y-%m-%d %H:%M:%S')}",
-            f"author: {message.author}",
-            f"channel: {message.channel}",
+        ]
+        if message.channel_type != "memo":
+            lines.append(f"author: {message.author}")
+            lines.append(f"channel: {message.channel}")
+        lines.extend([
             "---",
             "",
             message.content,
-        ]
+        ])
 
         # Add attachments section
         if message.attachments:
@@ -337,11 +345,12 @@ class MessageProcessor:
 
         metadata = {
             "timestamp": local_time.strftime("%Y-%m-%d %H:%M"),
-            "author": message.author,
-            "channel": message.channel,
             "attachments": message.attachments,
             "channel_type": message.channel_type,
         }
+        if message.channel_type != "memo":
+            metadata["author"] = message.author
+            metadata["channel"] = message.channel
 
         content = content_override if content_override else message.content
         result = self.ai.format_message(content, metadata, existing_content)

@@ -1,13 +1,24 @@
 """Discord input adapter for receiving messages."""
 import logging
-from typing import Callable, Awaitable, List
+from datetime import datetime, timezone
+from typing import Callable, Awaitable, List, Optional
 
 import discord
-from discord import Intents
+from discord import Intents, app_commands
 
 from adapters.base import BaseInputAdapter, MessageData
 
 logger = logging.getLogger(__name__)
+
+# Slash command definitions: (name, description, label for response)
+_SLASH_COMMANDS = [
+    ("memo", "メモをObsidianに保存", "メモ"),
+    ("diary", "日記をObsidianに保存", "日記"),
+    ("reading", "読書メモをObsidianに保存", "読書メモ"),
+    ("todo", "タスクをObsidianに保存", "タスク"),
+    ("glossary", "用語集に追加", "用語集"),
+    ("youtube", "YouTube文字起こしノートを作成", "YouTubeノート"),
+]
 
 
 class DiscordInput(BaseInputAdapter):
@@ -43,19 +54,95 @@ class DiscordInput(BaseInputAdapter):
         intents.guild_messages = True
 
         self.client = discord.Client(intents=intents)
+        self.tree = app_commands.CommandTree(self.client)
         self._setup_event_handlers()
+        self._setup_slash_commands()
 
     def _setup_event_handlers(self) -> None:
         """Set up Discord event handlers."""
 
         @self.client.event
         async def on_ready():
+            await self.tree.sync()
             logger.info(f"Discord bot logged in as {self.client.user}")
             logger.info(f"Monitoring channels: {self.channels}")
+            logger.info("Slash commands synced")
 
         @self.client.event
         async def on_message(message: discord.Message):
             await self._handle_message(message)
+
+    def _setup_slash_commands(self) -> None:
+        """Register slash commands for all channel types."""
+
+        for cmd_name, cmd_desc, cmd_label in _SLASH_COMMANDS:
+            self._register_slash_command(cmd_name, cmd_desc, cmd_label)
+
+    def _register_slash_command(
+        self, name: str, description: str, label: str
+    ) -> None:
+        """Register a single slash command."""
+
+        @self.tree.command(name=name, description=description)
+        @app_commands.describe(
+            content="保存する内容",
+            attachment="添付ファイル（画像など）",
+        )
+        async def slash_handler(
+            interaction: discord.Interaction,
+            content: str,
+            attachment: Optional[discord.Attachment] = None,
+            _name: str = name,
+            _label: str = label,
+        ):
+            await self._handle_slash_command(
+                interaction, content, _name, _label, attachment
+            )
+
+    async def _handle_slash_command(
+        self,
+        interaction: discord.Interaction,
+        content: str,
+        channel_type: str,
+        label: str,
+        attachment: Optional[discord.Attachment],
+    ) -> None:
+        """Handle a slash command interaction."""
+        await interaction.response.defer()
+
+        logger.info(
+            f"Slash command /{channel_type} from {interaction.user.name}: "
+            f"{content[:50]}..."
+        )
+
+        attachments = [attachment.url] if attachment else []
+        channel_name = (
+            interaction.channel.name
+            if interaction.channel and hasattr(interaction.channel, "name")
+            else "slash-command"
+        )
+
+        message_data = MessageData(
+            content=content,
+            author=interaction.user.display_name,
+            timestamp=interaction.created_at or datetime.now(timezone.utc),
+            channel=channel_name,
+            attachments=attachments,
+            channel_type=channel_type,
+        )
+
+        try:
+            success = await self.on_message_callback(message_data)
+            if success:
+                await interaction.followup.send(f"✅ {label}を保存しました")
+            else:
+                await interaction.followup.send(f"❌ {label}の保存に失敗しました")
+        except Exception as e:
+            logger.error(f"Error processing slash command /{channel_type}: {e}")
+            try:
+                await interaction.followup.send(f"❌ エラーが発生しました: {e}")
+            except Exception:
+                pass
 
     async def _handle_message(self, message: discord.Message) -> None:
         """
