@@ -6,7 +6,7 @@ import logging
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pytz
 
@@ -313,7 +313,7 @@ class Bot:
             return f"{save_path}/{local_time.strftime('%Y-%m-%d_%H%M%S.md')}"
         return f"{save_path}/{local_time.strftime('%Y-%m-%d.md')}"
 
-    async def _handle_message(self, message: MessageData) -> bool:
+    async def _handle_message(self, message: MessageData) -> Tuple[bool, Optional[str]]:
         """
         Handle incoming message.
 
@@ -324,7 +324,7 @@ class Bot:
             message: Message data from input adapter
 
         Returns:
-            True if message was processed successfully
+            Tuple of (success, formatted_content)
         """
         file_key = self._resolve_file_key(message)
         lock = self._file_locks[file_key]
@@ -332,7 +332,7 @@ class Bot:
         async with lock:
             return await self._process_and_save(message)
 
-    async def _process_and_save(self, message: MessageData) -> bool:
+    async def _process_and_save(self, message: MessageData) -> Tuple[bool, Optional[str]]:
         """
         Fetch existing content, process message, and save to GitHub.
 
@@ -343,7 +343,8 @@ class Bot:
             message: Message data from input adapter
 
         Returns:
-            True if message was processed successfully
+            Tuple of (success, formatted_content).
+            formatted_content is the markdown saved to GitHub, or None on failure.
         """
         try:
             # Determine save path based on channel type
@@ -512,10 +513,12 @@ class Bot:
                 filename, content, append=append, base_path=save_path
             )
 
-            return success
+            if success:
+                return True, content
+            return False, None
         except Exception as e:
             logger.error(f"Error handling message: {e}")
-            return False
+            return False, None
 
     def _upload_attachments(self, message: MessageData, save_path: str) -> MessageData:
         """

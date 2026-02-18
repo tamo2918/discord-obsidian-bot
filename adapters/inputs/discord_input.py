@@ -1,12 +1,41 @@
 """Discord input adapter for receiving messages."""
+import io
 import logging
 from datetime import datetime, timezone
-from typing import Callable, Awaitable, List, Optional
+from typing import Callable, Awaitable, List, Optional, Tuple
 
 import discord
 from discord import Intents, app_commands
 
 from adapters.base import BaseInputAdapter, MessageData
+
+# Discord message character limit (leave room for code block markers)
+_DISCORD_MAX_INLINE_LENGTH = 1800
+
+
+async def _send_formatted_content(
+    send_func,
+    content: str,
+    filename: str = "formatted.md",
+) -> None:
+    """Send formatted markdown content to Discord.
+
+    Uses an inline code block for short content, or a file attachment
+    when the content exceeds Discord's character limit.
+
+    Args:
+        send_func: Async callable (e.g. message.reply or interaction.followup.send)
+        content: Formatted markdown content to send
+        filename: Filename to use when sending as a file attachment
+    """
+    if len(content) <= _DISCORD_MAX_INLINE_LENGTH:
+        await send_func(f"```md\n{content}\n```")
+    else:
+        file = discord.File(
+            io.BytesIO(content.encode("utf-8")),
+            filename=filename,
+        )
+        await send_func(file=file)
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +56,7 @@ class DiscordInput(BaseInputAdapter):
     def __init__(
         self,
         config: dict,
-        on_message_callback: Callable[[MessageData], Awaitable[bool]],
+        on_message_callback: Callable[[MessageData], Awaitable[Tuple[bool, Optional[str]]]],
     ):
         """
         Initialize the Discord input adapter.
@@ -132,9 +161,15 @@ class DiscordInput(BaseInputAdapter):
         )
 
         try:
-            success = await self.on_message_callback(message_data)
+            success, formatted_content = await self.on_message_callback(message_data)
             if success:
                 await interaction.followup.send(f"✅ {label}を保存しました")
+                if formatted_content:
+                    await _send_formatted_content(
+                        interaction.followup.send,
+                        formatted_content,
+                        filename=f"{channel_type}.md",
+                    )
             else:
                 await interaction.followup.send(f"❌ {label}の保存に失敗しました")
         except Exception as e:
@@ -179,12 +214,21 @@ class DiscordInput(BaseInputAdapter):
 
         try:
             # Process message through callback
-            success = await self.on_message_callback(message_data)
+            success, formatted_content = await self.on_message_callback(message_data)
 
             # Add reaction based on result
             if success:
                 await message.add_reaction("✅")
                 logger.info("Message processed successfully")
+                if formatted_content:
+                    try:
+                        await _send_formatted_content(
+                            message.reply,
+                            formatted_content,
+                            filename=f"{channel_type}.md",
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to send formatted content reply: {e}")
             else:
                 await message.add_reaction("❌")
                 logger.warning("Message processing failed")

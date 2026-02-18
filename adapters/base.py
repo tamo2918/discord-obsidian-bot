@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable, List, Awaitable, Optional
+from typing import Callable, List, Awaitable, Optional, Tuple
 
 
 @dataclass
@@ -24,7 +24,7 @@ class BaseInputAdapter(ABC):
     def __init__(
         self,
         config: dict,
-        on_message_callback: Callable[[MessageData], Awaitable[bool]],
+        on_message_callback: Callable[[MessageData], Awaitable[Tuple[bool, Optional[str]]]],
     ):
         """
         Initialize the input adapter.
@@ -32,7 +32,7 @@ class BaseInputAdapter(ABC):
         Args:
             config: Configuration dictionary for this adapter
             on_message_callback: Async callback to handle received messages.
-                                Returns True if message was processed successfully.
+                                Returns (success, formatted_content) tuple.
         """
         pass
 

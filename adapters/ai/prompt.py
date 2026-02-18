@@ -36,7 +36,7 @@ tags: []
 `## メモ` セクションの下に、新しいメモを追加する:
 - **`[[内部リンク]]` を積極的に付ける（最重要）**
 - 元の意味を変えない
-- 添付画像は `![]()` 形式で残す
+- **添付画像は `![[ファイル名]]` 形式で、1行に1つずつ全て残す（絶対に省略しない）**
 - **メッセージの内容はできる限りすべて含める。要約や省略をしない**
 
 ## 内部リンク `[[]]`（最重要）
@@ -147,7 +147,7 @@ energy: 5
 - 翌日の予定・やりたいこと → `### 明日やること`
 - **`[[内部リンク]]` を積極的に付ける（最重要）**
 - 元の意味を変えない
-- 添付画像は `![]()` 形式で残す
+- **添付画像は `![[ファイル名]]` 形式で、1行に1つずつ全て残す（絶対に省略しない）**
 - **メッセージの内容はできる限りすべて含める。要約や省略をしない**
 
 ## 文体ルール（重要）
@@ -723,7 +723,14 @@ def build_user_prompt(
         parts.append(f"チャンネル: {metadata['channel']}")
 
     if metadata.get("attachments"):
-        urls = "\n".join(metadata["attachments"])
-        parts.append(f"添付画像:\n{urls}")
+        # Pre-format as Obsidian embeds so AI just preserves them
+        embeds = []
+        for path in metadata["attachments"]:
+            if path.startswith("http"):
+                embeds.append(f"![]({path})")
+            else:
+                filename = path.split("/")[-1]
+                embeds.append(f"![[{filename}]]")
+        parts.append(f"添付画像（以下を全てそのまま本文中に含めてください）:\n" + "\n".join(embeds))
 
     return "\n\n".join(parts)

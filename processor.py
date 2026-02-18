@@ -218,6 +218,30 @@ class MessageProcessor:
             "-\n"
         )
 
+    def _ensure_attachments_in_content(self, content: str, attachments: list) -> str:
+        """Ensure all attachments are present in content, appending any missing ones."""
+        if not attachments:
+            return content
+
+        missing = []
+        for path in attachments:
+            if path.startswith("http"):
+                embed = f"![]({path})"
+            else:
+                filename = path.split("/")[-1]
+                embed = f"![[{filename}]]"
+
+            if embed not in content:
+                missing.append(embed)
+
+        if missing:
+            logger.warning(
+                f"AI output missing {len(missing)} attachment(s), appending them"
+            )
+            content = content.rstrip() + "\n\n" + "\n".join(missing)
+
+        return content
+
     def _format_attachments(self, attachments: list) -> str:
         """Format attachments as Markdown image links."""
         if not attachments:
@@ -677,6 +701,10 @@ class MessageProcessor:
         ai_content = self._try_ai_format(message, existing_content)
 
         if ai_content:
+            # Ensure all attachments are present in AI output
+            ai_content = self._ensure_attachments_in_content(
+                ai_content, message.attachments
+            )
             if existing_content:
                 # AI integrated existing + new content → overwrite the file
                 return filename, ai_content, False
