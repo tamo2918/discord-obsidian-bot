@@ -66,14 +66,11 @@ def load_config_from_env() -> Dict[str, Any]:
     Load configuration from environment variables.
 
     Channel configuration (at least one required):
-        - CHANNEL_MEMO: Comma-separated memo channel IDs
         - CHANNEL_DIARY: Comma-separated diary channel IDs
         - CHANNEL_READING: Comma-separated reading channel IDs
         - CHANNEL_TODO: Comma-separated todo channel IDs
-        - DISCORD_CHANNELS: (Backward compat) treated as memo channels
 
     Path configuration:
-        - GITHUB_PATH_MEMO: Save path for memos (default: Inbox)
         - GITHUB_PATH_DIARY: Save path for diary (default: Diary)
         - GITHUB_PATH_READING: Save path for reading notes (default: Reading)
         - GITHUB_PATH_TODO: Save path for todo board (default: Todo)
@@ -83,13 +80,6 @@ def load_config_from_env() -> Dict[str, Any]:
     """
     # Build channel_map: {channel_id: type}
     channel_map: Dict[str, str] = {}
-
-    # Memo channels (CHANNEL_MEMO or fallback to DISCORD_CHANNELS)
-    memo_channels = _parse_channels(os.environ.get("CHANNEL_MEMO", ""))
-    if not memo_channels:
-        memo_channels = _parse_channels(os.environ.get("DISCORD_CHANNELS", ""))
-    for ch in memo_channels:
-        channel_map[ch] = "memo"
 
     # Diary channels
     diary_channels = _parse_channels(os.environ.get("CHANNEL_DIARY", ""))
@@ -118,9 +108,6 @@ def load_config_from_env() -> Dict[str, Any]:
 
     # Path map: channel_type -> save path
     path_map = {
-        "memo": os.environ.get(
-            "GITHUB_PATH_MEMO", os.environ.get("GITHUB_PATH", "00_Inbox")
-        ),
         "diary": os.environ.get("GITHUB_PATH_DIARY", "10_Diary"),
         "reading": os.environ.get("GITHUB_PATH_READING", "60_Reading"),
         "todo": os.environ.get("GITHUB_PATH_TODO", "20_Todo"),
@@ -556,7 +543,7 @@ class Bot:
         """
         channel_map = self.config.get("discord", {}).get("channel_map", {})
         active_types = set(channel_map.values())
-        return [t for t in ("memo", "diary") if t in active_types]
+        return [t for t in ("diary",) if t in active_types]
 
     async def _create_daily_templates(self) -> None:
         """
@@ -689,8 +676,8 @@ async def main():
     if not has_channels:
         logger.error(
             "Discord channels are required "
-            "(set CHANNEL_MEMO, CHANNEL_DIARY, CHANNEL_READING, "
-            "CHANNEL_TODO, or DISCORD_CHANNELS)"
+            "(set CHANNEL_DIARY, CHANNEL_READING, "
+            "CHANNEL_TODO, or CHANNEL_GLOSSARY)"
         )
         sys.exit(1)
 

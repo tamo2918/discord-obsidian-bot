@@ -41,7 +41,6 @@ logger = logging.getLogger(__name__)
 
 # Slash command definitions: (name, description, label for response)
 _SLASH_COMMANDS = [
-    ("memo", "メモをObsidianに保存", "メモ"),
     ("diary", "日記をObsidianに保存", "日記"),
     ("reading", "読書メモをObsidianに保存", "読書メモ"),
     ("todo", "タスクをObsidianに保存", "タスク"),

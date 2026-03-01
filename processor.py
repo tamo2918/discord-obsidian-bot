@@ -57,46 +57,33 @@ class MessageProcessor:
         Returns:
             Markdown string with YAML frontmatter and section structure
         """
-        if channel_type == "diary":
-            return (
-                "---\n"
-                "type: diary\n"
-                f"created: {date_str}\n"
-                "tags: []\n"
-                "mood: 5\n"
-                "energy: 5\n"
-                "---\n"
-                "\n"
-                "## 今日のログ\n"
-                "\n"
-                "### やったこと\n"
-                "-\n"
-                "\n"
-                "### あったこと\n"
-                "-\n"
-                "\n"
-                "### 考えたこと\n"
-                "-\n"
-                "\n"
-                "### 明日やること\n"
-                "-\n"
-                "\n"
-                "## 習慣\n"
-                "- [ ] 読書\n"
-                "- [ ] 筋トレ\n"
-            )
-        else:
-            # memo (Inbox)
-            return (
-                "---\n"
-                "type: memo\n"
-                f"created: {date_str}\n"
-                "processed: false\n"
-                "tags: []\n"
-                "---\n"
-                "\n"
-                "## メモ\n"
-            )
+        return (
+            "---\n"
+            "type: diary\n"
+            f"created: {date_str}\n"
+            "tags: []\n"
+            "mood: 5\n"
+            "energy: 5\n"
+            "---\n"
+            "\n"
+            "## 今日のログ\n"
+            "\n"
+            "### やったこと\n"
+            "-\n"
+            "\n"
+            "### あったこと\n"
+            "-\n"
+            "\n"
+            "### 考えたこと\n"
+            "-\n"
+            "\n"
+            "### 明日やること\n"
+            "-\n"
+            "\n"
+            "## 習慣\n"
+            "- [ ] 読書\n"
+            "- [ ] 筋トレ\n"
+        )
 
     def generate_reading_template(self, date_str: str, book_title: str) -> str:
         """
@@ -275,17 +262,11 @@ class MessageProcessor:
         # Filename: YYYY-MM-DD.md
         filename = local_time.strftime("%Y-%m-%d.md")
 
-        # Content format (memo: no time heading, diary: keep time heading)
-        if message.channel_type == "memo":
-            lines = [
-                message.content,
-            ]
-        else:
-            lines = [
-                f"## {local_time.strftime('%H:%M')}",
-                "",
-                message.content,
-            ]
+        lines = [
+            f"## {local_time.strftime('%H:%M')}",
+            "",
+            message.content,
+        ]
 
         # Add attachments
         attachments_md = self._format_attachments(message.attachments)
@@ -314,14 +295,12 @@ class MessageProcessor:
         # Filename: YYYY-MM-DD_HHMMSS.md
         filename = local_time.strftime("%Y-%m-%d_%H%M%S.md")
 
-        # Content format with frontmatter (memo: no author/channel)
         lines = [
             "---",
             f"date: {local_time.strftime('%Y-%m-%d %H:%M:%S')}",
+            f"author: {message.author}",
+            f"channel: {message.channel}",
         ]
-        if message.channel_type != "memo":
-            lines.append(f"author: {message.author}")
-            lines.append(f"channel: {message.channel}")
         lines.extend([
             "---",
             "",
@@ -372,9 +351,8 @@ class MessageProcessor:
             "attachments": message.attachments,
             "channel_type": message.channel_type,
         }
-        if message.channel_type != "memo":
-            metadata["author"] = message.author
-            metadata["channel"] = message.channel
+        metadata["author"] = message.author
+        metadata["channel"] = message.channel
 
         content = content_override if content_override else message.content
         result = self.ai.format_message(content, metadata, existing_content)
