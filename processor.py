@@ -675,23 +675,25 @@ class MessageProcessor:
             filename = local_time.strftime("%Y-%m-%d.md")
             should_append = True
 
-        # Try AI formatting first (with existing content if available)
-        ai_content = self._try_ai_format(message, existing_content)
+        # Memo: skip AI, save as-is
+        # Other types (diary etc.): try AI formatting first
+        if message.channel_type != "memo":
+            ai_content = self._try_ai_format(message, existing_content)
 
-        if ai_content:
-            # Ensure all attachments are present in AI output
-            ai_content = self._ensure_attachments_in_content(
-                ai_content, message.attachments
-            )
-            if existing_content:
-                # AI integrated existing + new content → overwrite the file
-                return filename, ai_content, False
-            if should_append:
-                # No existing content but append mode → strip frontmatter
-                ai_content = self._strip_frontmatter(ai_content)
-            return filename, ai_content, should_append
+            if ai_content:
+                # Ensure all attachments are present in AI output
+                ai_content = self._ensure_attachments_in_content(
+                    ai_content, message.attachments
+                )
+                if existing_content:
+                    # AI integrated existing + new content → overwrite the file
+                    return filename, ai_content, False
+                if should_append:
+                    # No existing content but append mode → strip frontmatter
+                    ai_content = self._strip_frontmatter(ai_content)
+                return filename, ai_content, should_append
 
-        # Fallback: plain Markdown
+        # Plain Markdown
         if self.template == "single":
             _, content = self._process_single(message)
         else:
